@@ -290,7 +290,6 @@ impl App {
         // Generate pairs of points for arrows
         let random_seed = generate_random_seed();
         let arrows = generate_pairs(random_seed);
-        println!("arrows: {:?}", arrows);
 
         Self {
             window: None,
@@ -520,7 +519,6 @@ fn generate_pairs(seed: BigInt) -> Vec<(u32, u32)> {
             (second.wrapping_sub(10)) % 100
         };
 
-        // println!("first: {}, second: {}", first, second);
         pairs.push((first, final_second));
     }
 
