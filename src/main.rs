@@ -1,4 +1,7 @@
 use ab_glyph::{Font, FontArc, Glyph, PxScale};
+use curv::BigInt;
+use curv::arithmetic::Converter;
+use rand::Rng;
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -467,9 +470,70 @@ impl ApplicationHandler for App {
     }
 }
 
+fn generate_pairs(seed: BigInt) -> Vec<(u32, u32)> {
+    let seed_str = seed.to_string();
+    let num_pairs = ((&seed % BigInt::from(6)) + BigInt::from(5))
+        .to_string()
+        .parse::<u32>()
+        .unwrap_or(5)
+        .clamp(5, 10);
+    let mut pairs = Vec::new();
+
+    for i in 1..num_pairs {
+        // println!("i: {}", i);
+        let start = (i * 4) as usize;
+        // println!("start: {}", start);
+        // println!("seed_str.len(): {}", seed_str.len());
+        if start + 4 > seed_str.len() {
+            break;
+        }
+        // println!("after");
+
+        let chunk = &seed_str[start..start + 4];
+        let first = chunk[0..2].parse::<u32>().unwrap_or(1).max(1).min(100);
+        let second = chunk[2..4].parse::<u32>().unwrap_or(1).max(1).min(100);
+
+        let first_decade = first / 10;
+        let second_decade = second / 10;
+
+        let final_second = if first_decade != second_decade {
+            second
+        } else if second >= first {
+            (second + 10) % 100
+        } else {
+            (second.wrapping_sub(10)) % 100
+        };
+
+        // println!("first: {}, second: {}", first, second);
+        pairs.push((first, final_second));
+    }
+
+    pairs
+}
+
+// Temporary auxiliraty function to generate a seed
+fn generate_random_seed() -> BigInt {
+    let mut rng = rand::rng();
+    let mut digits = String::new();
+
+    // First digit must be 1-9 to ensure 192 digits
+    digits.push_str(&rng.random_range(1..=9).to_string());
+
+    // Generate remaining 191 digits (0-9)
+    for _ in 0..191 {
+        digits.push_str(&rng.random_range(0..=9).to_string());
+    }
+
+    BigInt::from_str_radix(&digits, 10).expect("Invalid BigInt string")
+}
+
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
+
+    let y = generate_random_seed();
+    let points = generate_pairs(y);
+    println!("points: {:?}", points);
 
     let mut app = App::new();
     event_loop.run_app(&mut app).unwrap();
