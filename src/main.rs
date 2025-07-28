@@ -2,7 +2,7 @@ use ab_glyph::{Font, FontArc, Glyph, PxScale};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -128,6 +128,89 @@ fn draw_square(
     }
 }
 
+fn draw_arrow(
+    pixmap: &mut Pixmap,
+    start: (usize, usize),
+    end: (usize, usize),
+    scale: f32,
+    offset_x_start: f32,
+    offset_y_start: f32,
+    spacing: f32,
+) {
+    // Calculate center of start and end squares
+    let start_x = offset_x_start + start.1 as f32 * spacing + scale;
+    let start_y = offset_y_start + start.0 as f32 * spacing + scale;
+    let end_x = offset_x_start + end.1 as f32 * spacing + scale;
+    let end_y = offset_y_start + end.0 as f32 * spacing + scale;
+
+    // Create path for the arrow line
+    let mut pb = PathBuilder::new();
+    pb.move_to(start_x, start_y);
+    pb.line_to(end_x, end_y);
+    let path = pb.finish().unwrap();
+
+    // Set up paint for the arrow
+    let mut paint = Paint::default();
+    paint.set_color(Color::from_rgba8(0, 0, 0, 255));
+    paint.anti_alias = true;
+
+    // Draw the arrow line
+    pixmap.stroke_path(
+        &path,
+        &paint,
+        &Stroke {
+            width: scale * 0.05,
+            line_cap: tiny_skia::LineCap::Round,
+            line_join: tiny_skia::LineJoin::Round,
+            ..Default::default()
+        },
+        Transform::identity(),
+        None,
+    );
+
+    // Calculate arrowhead
+    let dx = end_x - start_x;
+    let dy = end_y - start_y;
+    let len = (dx * dx + dy * dy).sqrt();
+    if len == 0.0 {
+        return;
+    }
+    let ux = dx / len;
+    let uy = dy / len;
+
+    // Arrowhead parameters
+    let arrow_size = scale * 0.5; // Increased size for fatter arrowhead
+    let angle: f32 = 0.4; // Increased angle for wider arrowhead
+
+    // Points for arrowhead triangle
+    let p1 = (end_x, end_y);
+    let p2 = (
+        end_x - arrow_size * (ux * angle.cos() + uy * angle.sin()),
+        end_y - arrow_size * (uy * angle.cos() - ux * angle.sin()),
+    );
+    let p3 = (
+        end_x - arrow_size * (ux * angle.cos() - uy * angle.sin()),
+        end_y - arrow_size * (uy * angle.cos() + ux * angle.sin()),
+    );
+
+    // Create path for arrowhead
+    let mut pb = PathBuilder::new();
+    pb.move_to(p1.0, p1.1);
+    pb.line_to(p2.0, p2.1);
+    pb.line_to(p3.0, p3.1);
+    pb.close();
+    let arrowhead = pb.finish().unwrap();
+
+    // Draw filled arrowhead
+    pixmap.fill_path(
+        &arrowhead,
+        &paint,
+        FillRule::Winding,
+        Transform::identity(),
+        None,
+    );
+}
+
 struct App {
     window: Option<Arc<Window>>,
     surface: Option<Surface<Arc<Window>, Arc<Window>>>,
@@ -139,7 +222,6 @@ struct App {
 impl App {
     fn new() -> Self {
         // Define a list of u32 colors (RGBA format)
-        //let colors = vec![0xFF0066FF, 0xFF00FF00, 0xFFFF0000, 0xFFFFFF00];
         let colors = vec![
             0xFF0066FF, // Blue
             0xFF00AA00, // Green
@@ -209,6 +291,17 @@ impl App {
                 }
             }
 
+            // Example: Draw an arrow from (1,1) to (3,3)
+            draw_arrow(
+                &mut pixmap,
+                (1, 1),
+                (3, 3),
+                square_scale,
+                offset_x_start,
+                offset_y_start,
+                spacing,
+            );
+
             // Copy pixmap to softbuffer
             for (i, pixel) in pixmap.pixels().iter().enumerate() {
                 let r = pixel.red();
@@ -228,7 +321,7 @@ impl App {
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_attributes = WindowAttributes::default()
-            .with_title("Einstein Tile Grid")
+            .with_title("The dynamic of life game")
             .with_inner_size(winit::dpi::LogicalSize::new(800, 800));
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
