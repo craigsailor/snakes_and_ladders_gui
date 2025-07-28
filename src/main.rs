@@ -1,4 +1,7 @@
 use ab_glyph::{Font, FontArc, Glyph, PxScale};
+use curv::BigInt;
+use curv::arithmetic::Converter;
+use rand::Rng;
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -162,18 +165,26 @@ fn draw_square(
 
 fn draw_arrow(
     pixmap: &mut Pixmap,
-    start: (usize, usize),
-    end: (usize, usize),
+    start_num: u32,
+    end_num: u32,
     scale: f32,
     offset_x_start: f32,
     offset_y_start: f32,
     spacing: f32,
 ) {
+    // Convert square numbers (1 to 100) to grid coordinates
+    let grid_size = 10;
+    // Numbering: 1 at bottom-right (row 9, col 9), 100 at top-left (row 0, col 0)
+    let start_row = 9 - ((start_num - 1) / grid_size) as usize;
+    let start_col = 9 - ((start_num - 1) % grid_size) as usize;
+    let end_row = 9 - ((end_num - 1) / grid_size) as usize;
+    let end_col = 9 - ((end_num - 1) % grid_size) as usize;
+
     // Calculate center of start and end squares
-    let start_x = offset_x_start + start.1 as f32 * spacing + scale;
-    let start_y = offset_y_start + start.0 as f32 * spacing + scale;
-    let end_x = offset_x_start + end.1 as f32 * spacing + scale;
-    let end_y = offset_y_start + end.0 as f32 * spacing + scale;
+    let start_x = offset_x_start + start_col as f32 * spacing + scale;
+    let start_y = offset_y_start + start_row as f32 * spacing + scale;
+    let end_x = offset_x_start + end_col as f32 * spacing + scale;
+    let end_y = offset_y_start + end_row as f32 * spacing + scale;
 
     // Create path for the arrow line
     let mut pb = PathBuilder::new();
@@ -251,6 +262,7 @@ struct App {
     squares: Vec<GameSquare>,
     font: FontArc,
     cursor_position: (f64, f64),
+    arrows: Vec<(u32, u32)>,
 }
 
 impl App {
@@ -275,6 +287,10 @@ impl App {
         let font = FontArc::try_from_slice(font_data).expect("Failed to load font");
         let squares = Vec::new();
 
+        // Generate pairs of points for arrows
+        let random_seed = generate_random_seed();
+        let arrows = generate_pairs(random_seed);
+
         Self {
             window: None,
             surface: None,
@@ -283,6 +299,7 @@ impl App {
             squares,
             font,
             cursor_position: (0.0, 0.0),
+            arrows,
         }
     }
 
@@ -339,16 +356,18 @@ impl App {
                 }
             }
 
-            // Example: Draw an arrow from (1,1) to (3,3)
-            draw_arrow(
-                &mut pixmap,
-                (1, 1),
-                (3, 3),
-                square_scale,
-                offset_x_start,
-                offset_y_start,
-                spacing,
-            );
+            // Draw an arrow for each pair in points
+            for (start, end) in self.arrows.clone() {
+                draw_arrow(
+                    &mut pixmap,
+                    start,
+                    end,
+                    square_scale,
+                    offset_x_start,
+                    offset_y_start,
+                    spacing,
+                );
+            }
 
             // Copy pixmap to softbuffer
             for (i, pixel) in pixmap.pixels().iter().enumerate() {
@@ -465,6 +484,61 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
+}
+
+fn generate_pairs(seed: BigInt) -> Vec<(u32, u32)> {
+    let seed_str = seed.to_string();
+
+    let num_pairs = ((&seed % BigInt::from(6)) + BigInt::from(5))
+        .to_string()
+        .parse::<u32>()
+        .unwrap_or(5)
+        .clamp(5, 10);
+
+    let mut pairs = Vec::new();
+
+    for i in 1..num_pairs + 1 {
+        let start = (i * 4) as usize;
+
+        if start + 4 > seed_str.len() {
+            break;
+        }
+
+        let chunk = &seed_str[start..start + 4];
+        let first = chunk[0..2].parse::<u32>().unwrap_or(1).max(1).min(100);
+        let second = chunk[2..4].parse::<u32>().unwrap_or(1).max(1).min(100);
+
+        let first_decade = first / 10;
+        let second_decade = second / 10;
+
+        let final_second = if first_decade != second_decade {
+            second
+        } else if second >= first {
+            (second + 10) % 100
+        } else {
+            (second.wrapping_sub(10)) % 100
+        };
+
+        pairs.push((first, final_second));
+    }
+
+    pairs
+}
+
+// Temporary auxiliraty function to generate a seed
+fn generate_random_seed() -> BigInt {
+    let mut rng = rand::rng();
+    let mut digits = String::new();
+
+    // First digit must be 1-9 to ensure 192 digits
+    digits.push_str(&rng.random_range(1..=9).to_string());
+
+    // Generate remaining 191 digits (0-9)
+    for _ in 0..191 {
+        digits.push_str(&rng.random_range(0..=9).to_string());
+    }
+
+    BigInt::from_str_radix(&digits, 10).expect("Invalid BigInt string")
 }
 
 fn main() {
