@@ -4,10 +4,42 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
+
+#[derive(Debug, Clone)]
+struct GameSquare {
+    id: u32,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    color: u32, // ARGB format
+}
+
+impl GameSquare {
+    fn new(id: u32, x: i32, y: i32, width: u32, height: u32, color: u32) -> Self {
+        Self {
+            id,
+            x,
+            y,
+            width,
+            height,
+            color,
+        }
+    }
+
+    fn contains_point(&self, px: f64, py: f64) -> bool {
+        let px = px as i32;
+        let py = py as i32;
+        px >= self.x
+            && px < self.x + self.width as i32
+            && py >= self.y
+            && py < self.y + self.height as i32
+    }
+}
 
 fn draw_square(
     pixmap: &mut Pixmap,
@@ -216,7 +248,9 @@ struct App {
     surface: Option<Surface<Arc<Window>, Arc<Window>>>,
     context: Option<Context<Arc<Window>>>,
     colors: Vec<u32>,
+    squares: Vec<GameSquare>,
     font: FontArc,
+    cursor_position: (f64, f64),
 }
 
 impl App {
@@ -239,13 +273,16 @@ impl App {
         // Ensure DejaVuSans.ttf is in your project directory
         let font_data = include_bytes!("./DejaVuSans-Bold.ttf");
         let font = FontArc::try_from_slice(font_data).expect("Failed to load font");
+        let squares = Vec::new();
 
         Self {
             window: None,
             surface: None,
             context: None,
             colors,
+            squares,
             font,
+            cursor_position: (0.0, 0.0),
         }
     }
 
@@ -278,6 +315,17 @@ impl App {
                     let color = self.colors[(square_number - 1) % self.colors.len()];
                     let offset_x = offset_x_start + col as f32 * spacing;
                     let offset_y = offset_y_start + row as f32 * spacing;
+
+                    self.squares.push(GameSquare::new(
+                        square_number as u32,
+                        offset_x as i32,
+                        offset_y as i32,
+                        //(offset_x + offset_x_start) as u32,
+                        // (offset_y + offset_y_start) as u32,
+                        (square_scale * 2.0) as u32,
+                        (square_scale * 2.0) as u32,
+                        color,
+                    ));
 
                     draw_square(
                         &mut pixmap,
@@ -372,6 +420,37 @@ impl ApplicationHandler for App {
                     window.request_redraw();
                 }
             }
+
+            WindowEvent::CursorMoved { position, .. } => {
+                self.cursor_position = (position.x, position.y);
+                //println!("Mouse moved to: x={:.2}, y={:.2}", position.x, position.y);
+            }
+
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            } => {
+                //println!( "Left mouse button pressed at: x={:.2}, y={:.2}", self.cursor_position.0, self.cursor_position.1);
+
+                // Check which rectangle was clicked
+                let mut found = false;
+                for square in &self.squares {
+                    if square.contains_point(self.cursor_position.0, self.cursor_position.1) {
+                        println!(
+                            "🎯 Clicked inside game square ID: {} (pos: {},{}, size: {}x{})",
+                            square.id, square.x, square.y, square.width, square.height
+                        );
+                        found = true;
+                        break; // Only report the first (topmost) rectangle
+                    }
+                }
+
+                if !found {
+                    println!("Clicked in empty space");
+                }
+            }
+
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
