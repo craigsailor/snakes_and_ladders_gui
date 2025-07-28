@@ -9,7 +9,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
 
-fn draw_einstein_tile(
+fn draw_square(
     pixmap: &mut Pixmap,
     color: u32,
     scale: f32,
@@ -21,27 +21,7 @@ fn draw_einstein_tile(
     // Simple square
     let points = [(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)];
 
-    // This actually draws the Einstein tile shape
-    // 340.2 247
-    /*
-    let points = [
-        (89.3 / 150.2, 146.9 / 123.0),
-        (8.5 / 150.2, 194.0 / 123.0),
-        (35.3 / 150.2, 240.5 / 123.0),
-        (143.3 / 150.2, 240.5 / 123.0),
-        (170.2 / 150.2, 193.6 / 123.0),
-        (250.8 / 150.2, 240.7 / 123.0),
-        (331.7 / 150.2, 193.9 / 123.0),
-        (305.0 / 150.2, 146.9 / 123.0),
-        (251.0 / 150.2, 146.9 / 123.0),
-        (251.7 / 150.2, 53.4 / 123.0),
-        (170.1 / 150.2, 6.5 / 123.0),
-        (143.3 / 150.2, 53.4 / 123.0),
-        (89.3 / 150.2, 53.4 / 123.0),
-    ];
-    */
-
-    // Create a path for the tile fill
+    // Create a path for the square fill
     let mut pb = PathBuilder::new();
     pb.move_to(
         offset_x + points[0].0 * scale,
@@ -59,12 +39,12 @@ fn draw_einstein_tile(
     let b = ((color >> 8) & 0xFF) as f32 / 255.0;
     let a = (color & 0xFF) as f32 / 255.0;
 
-    // Set up paint for the tile fill
+    // Set up paint for the square fill
     let mut fill_paint = Paint::default();
     fill_paint.set_color(Color::from_rgba(r, g, b, a).unwrap());
     fill_paint.anti_alias = true;
 
-    // Draw the filled tile
+    // Draw the filled square
     pixmap.fill_path(
         &path,
         &fill_paint,
@@ -93,11 +73,11 @@ fn draw_einstein_tile(
         None,
     );
 
-    // Render the tile number using ab_glyph and tiny_skia
+    // Render the square number using ab_glyph and tiny_skia
     let text = number.to_string();
-    let text_size = scale * 0.45; // Adjust text size relative to tile scale
+    let text_size = scale * 0.45; // Adjust text size relative to square scale
 
-    // Calculate text position (center it in the tile)
+    // Calculate text position (center it in the square)
     let text_x = offset_x + scale * 0.6;
     let text_y = offset_y + scale * 1.0;
 
@@ -198,25 +178,32 @@ impl App {
             // Clear the pixmap with a white background
             pixmap.fill(Color::from_rgba8(255, 255, 255, 255));
 
-            // Draw a 10x10 grid of Einstein tiles
+            // Draw a 10x10 grid of squares
             let grid_size = 10;
-            let tile_scale = (width as f32) / (grid_size as f32 * 2.5); // Adjust scale to fit tiles
-            let spacing = (width as f32) / grid_size as f32;
+            // Set grid height to 80% of window height
+            let grid_height = height as f32 * 0.8;
+            let square_scale = grid_height / (grid_size as f32 * 2.5); // Scale squares to fit
+            let spacing = grid_height / grid_size as f32; // Spacing based on grid height
+
+            // Calculate offsets to center the grid
+            let grid_width = spacing * grid_size as f32;
+            let offset_x_start = (width as f32 - grid_width) / 2.0;
+            let offset_y_start = (height as f32 - grid_height) / 2.0;
 
             for row in 0..grid_size {
                 for col in 0..grid_size {
-                    let tile_number = 101 - (row * grid_size + col + 1); // Numbers 1 to 100
-                    let color = self.colors[(tile_number - 1) % self.colors.len()];
-                    let offset_x = col as f32 * spacing + spacing / 2.0;
-                    let offset_y = row as f32 * spacing + spacing / 2.0;
+                    let square_number = 101 - (row * grid_size + col + 1); // Numbers 1 to 100
+                    let color = self.colors[(square_number - 1) % self.colors.len()];
+                    let offset_x = offset_x_start + col as f32 * spacing;
+                    let offset_y = offset_y_start + row as f32 * spacing;
 
-                    draw_einstein_tile(
+                    draw_square(
                         &mut pixmap,
                         color,
-                        tile_scale,
-                        offset_x / 1.1,
-                        offset_y / 1.1,
-                        tile_number as u32,
+                        square_scale,
+                        offset_x,
+                        offset_y,
+                        square_number as u32,
                         &self.font,
                     );
                 }
