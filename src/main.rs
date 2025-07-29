@@ -1,3 +1,12 @@
+pub mod drawable;
+pub mod game_data;
+pub mod objects;
+
+// Re-export commonly used items for convenience
+pub use drawable::Drawable;
+pub use game_data::GameData;
+pub use objects::{Arrow, GameSettings, GameSquare, User};
+
 use ab_glyph::{Font, FontArc, Glyph, PxScale};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
@@ -8,6 +17,7 @@ use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
+use your_game_crate::{Arrow, GameData, GameSettings, GameSquare, User};
 
 #[derive(Debug, Clone)]
 struct GameSquare {
@@ -38,6 +48,33 @@ impl GameSquare {
             && px < self.x + self.width as i32
             && py >= self.y
             && py < self.y + self.height as i32
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Arrow {
+    id: u32,
+    from_game_square: GameSquare,
+    to_game_square: GameSquare,
+    line_width: u32,
+    color: u32,
+}
+
+impl Arrow {
+    fn new(
+        id: u32,
+        from_game_square: GameSquare,
+        to_game_square: GameSquare,
+        line_width: u32,
+        color: u32,
+    ) -> Self {
+        Self {
+            id,
+            from_game_square,
+            to_game_square,
+            line_width,
+            color,
+        }
     }
 }
 
