@@ -4,7 +4,7 @@ use crate::objects::{GameSettings, User};
 use std::collections::HashMap;
 
 // Main game data container
-pub struct GameData {
+pub struct GameState {
     // Drawable objects stored as trait objects
     pub drawable_objects: Vec<Box<dyn Drawable>>,
 
@@ -13,7 +13,7 @@ pub struct GameData {
     pub settings: GameSettings,
 }
 
-impl GameData {
+impl GameState {
     pub fn new() -> Self {
         Self {
             drawable_objects: Vec::new(),
@@ -58,7 +58,7 @@ impl GameData {
 // Example usage
 /*
 fn main() {
-    let mut game_data = GameData::new();
+    let mut game_data = GameState::new();
 
     // Add some drawable objects
     let square = Square {
