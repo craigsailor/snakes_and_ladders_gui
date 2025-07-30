@@ -4,7 +4,7 @@ pub mod objects;
 
 // Re-export commonly used items for convenience
 pub use drawable::Drawable;
-pub use game_data::GameData;
+pub use game_data::GameState;
 pub use objects::{Arrow, GameSettings, GameSquare, User};
 
 use ab_glyph::{Font, FontArc, Glyph, PxScale};
@@ -17,7 +17,7 @@ use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
-use your_game_crate::{Arrow, GameData, GameSettings, GameSquare, User};
+use your_game_crate::{Arrow, GameSettings, GameSquare, GameState, User};
 
 #[derive(Debug, Clone)]
 struct GameSquare {
