@@ -1,342 +1,51 @@
 pub mod drawable;
-pub mod game_data;
+pub mod game_board;
+pub mod game_state;
 pub mod objects;
 
 // Re-export commonly used items for convenience
+pub use crate::game_board::GameBoard;
 pub use drawable::Drawable;
-pub use game_data::GameState;
+pub use game_state::GameState;
 pub use objects::{Arrow, GameSettings, GameSquare, User};
+use std::cmp;
 
-use ab_glyph::{Font, FontArc, Glyph, PxScale};
-use curv::BigInt;
-use curv::arithmetic::Converter;
-use rand::Rng;
+//use crate::{Arrow, GameSettings, GameSquare, GameState, User};
+//use ab_glyph::{Font, FontArc, Glyph, PxScale};
+///use ab_glyph::FontArc;
 use softbuffer::{Context, Surface};
+//use std::fs;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
+//use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
+use tiny_skia::{Color, Pixmap};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
-use your_game_crate::{Arrow, GameSettings, GameSquare, GameState, User};
-
-#[derive(Debug, Clone)]
-struct GameSquare {
-    id: u32,
-    x: i32,
-    y: i32,
-    width: u32,
-    height: u32,
-    color: u32, // ARGB format
-}
-
-impl GameSquare {
-    fn new(id: u32, x: i32, y: i32, width: u32, height: u32, color: u32) -> Self {
-        Self {
-            id,
-            x,
-            y,
-            width,
-            height,
-            color,
-        }
-    }
-
-    fn contains_point(&self, px: f64, py: f64) -> bool {
-        let px = px as i32;
-        let py = py as i32;
-        px >= self.x
-            && px < self.x + self.width as i32
-            && py >= self.y
-            && py < self.y + self.height as i32
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Arrow {
-    id: u32,
-    from_game_square: GameSquare,
-    to_game_square: GameSquare,
-    line_width: u32,
-    color: u32,
-}
-
-impl Arrow {
-    fn new(
-        id: u32,
-        from_game_square: GameSquare,
-        to_game_square: GameSquare,
-        line_width: u32,
-        color: u32,
-    ) -> Self {
-        Self {
-            id,
-            from_game_square,
-            to_game_square,
-            line_width,
-            color,
-        }
-    }
-}
-
-fn draw_square(
-    pixmap: &mut Pixmap,
-    color: u32,
-    scale: f32,
-    offset_x: f32,
-    offset_y: f32,
-    number: u32,
-    font: &FontArc,
-) {
-    // Simple square
-    let points = [(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)];
-
-    // Create a path for the square fill
-    let mut pb = PathBuilder::new();
-    pb.move_to(
-        offset_x + points[0].0 * scale,
-        offset_y + points[0].1 * scale,
-    );
-    for &(x, y) in points.iter().skip(1) {
-        pb.line_to(offset_x + x * scale, offset_y + y * scale);
-    }
-    pb.close();
-    let path = pb.finish().unwrap();
-
-    // Extract RGBA components from u32 color (format: 0xRRGGBBAA)
-    let r = ((color >> 24) & 0xFF) as f32 / 255.0;
-    let g = ((color >> 16) & 0xFF) as f32 / 255.0;
-    let b = ((color >> 8) & 0xFF) as f32 / 255.0;
-    let a = (color & 0xFF) as f32 / 255.0;
-
-    // Set up paint for the square fill
-    let mut fill_paint = Paint::default();
-    fill_paint.set_color(Color::from_rgba(r, g, b, a).unwrap());
-    fill_paint.anti_alias = true;
-
-    // Draw the filled square
-    pixmap.fill_path(
-        &path,
-        &fill_paint,
-        FillRule::Winding,
-        Transform::identity(),
-        None,
-    );
-
-    // Set up paint for the black outline
-    let mut stroke_paint = Paint::default();
-    stroke_paint.set_color(Color::from_rgba8(0, 0, 0, 255));
-    stroke_paint.anti_alias = true;
-
-    // Draw the outline
-    let stroke_width = scale * 0.02; // Adjust stroke width relative to scale
-    pixmap.stroke_path(
-        &path,
-        &stroke_paint,
-        &tiny_skia::Stroke {
-            width: stroke_width,
-            line_cap: tiny_skia::LineCap::Round,
-            line_join: tiny_skia::LineJoin::Round,
-            ..Default::default()
-        },
-        Transform::identity(),
-        None,
-    );
-
-    // Render the square number using ab_glyph and tiny_skia
-    let text = number.to_string();
-    let text_size = scale * 0.45; // Adjust text size relative to square scale
-
-    // Calculate text position (center it in the square)
-    let text_x = offset_x + scale * 0.6;
-    let text_y = offset_y + scale * 1.0;
-
-    // Create a path for the text
-    let mut text_path = PathBuilder::new();
-    let mut current_x = text_x;
-
-    for c in text.chars() {
-        let glyph_id = font.glyph_id(c);
-        let glyph = Glyph {
-            id: glyph_id,
-            scale: PxScale::from(text_size),
-            position: ab_glyph::point(current_x, text_y + 1.0),
-        };
-
-        if let Some(outlined) = font.outline_glyph(glyph) {
-            // Convert the glyph outline to a tiny_skia path
-            outlined.draw(|x, y, coverage| {
-                if coverage > 0.5 {
-                    let px = x as f32 + outlined.px_bounds().min.x;
-                    let py = y as f32 + outlined.px_bounds().min.y;
-
-                    // Create a small rectangle for each pixel of the glyph
-                    text_path.push_rect(tiny_skia::Rect::from_xywh(px, py, 1.0, 1.0).unwrap());
-                }
-            });
-
-            //current_x += font.h_advance(glyph_id) * text_size / font.units_per_em();
-            current_x +=
-                font.h_advance_unscaled(glyph_id) * text_size / font.units_per_em().unwrap() as f32;
-        }
-    }
-
-    if let Some(text_path) = text_path.finish() {
-        // Set up paint for the text (black color)
-        let mut text_paint = Paint::default();
-        text_paint.set_color(Color::from_rgba8(0, 0, 0, 255));
-        text_paint.anti_alias = true;
-
-        // Draw the text
-        pixmap.fill_path(
-            &text_path,
-            &text_paint,
-            FillRule::Winding,
-            Transform::identity(),
-            None,
-        );
-    }
-}
-
-fn draw_arrow(
-    pixmap: &mut Pixmap,
-    start_num: u32,
-    end_num: u32,
-    scale: f32,
-    offset_x_start: f32,
-    offset_y_start: f32,
-    spacing: f32,
-) {
-    // Convert square numbers (1 to 100) to grid coordinates
-    let grid_size = 10;
-    // Numbering: 1 at bottom-right (row 9, col 9), 100 at top-left (row 0, col 0)
-    let start_row = 9 - ((start_num - 1) / grid_size) as usize;
-    let start_col = 9 - ((start_num - 1) % grid_size) as usize;
-    let end_row = 9 - ((end_num - 1) / grid_size) as usize;
-    let end_col = 9 - ((end_num - 1) % grid_size) as usize;
-
-    // Calculate center of start and end squares
-    let start_x = offset_x_start + start_col as f32 * spacing + scale;
-    let start_y = offset_y_start + start_row as f32 * spacing + scale;
-    let end_x = offset_x_start + end_col as f32 * spacing + scale;
-    let end_y = offset_y_start + end_row as f32 * spacing + scale;
-
-    // Create path for the arrow line
-    let mut pb = PathBuilder::new();
-    pb.move_to(start_x, start_y);
-    pb.line_to(end_x, end_y);
-    let path = pb.finish().unwrap();
-
-    // Set up paint for the arrow
-    let mut paint = Paint::default();
-    paint.set_color(Color::from_rgba8(0, 0, 0, 255));
-    paint.anti_alias = true;
-
-    // Draw the arrow line
-    pixmap.stroke_path(
-        &path,
-        &paint,
-        &Stroke {
-            width: scale * 0.05,
-            line_cap: tiny_skia::LineCap::Round,
-            line_join: tiny_skia::LineJoin::Round,
-            ..Default::default()
-        },
-        Transform::identity(),
-        None,
-    );
-
-    // Calculate arrowhead
-    let dx = end_x - start_x;
-    let dy = end_y - start_y;
-    let len = (dx * dx + dy * dy).sqrt();
-    if len == 0.0 {
-        return;
-    }
-    let ux = dx / len;
-    let uy = dy / len;
-
-    // Arrowhead parameters
-    let arrow_size = scale * 0.5; // Increased size for fatter arrowhead
-    let angle: f32 = 0.4; // Increased angle for wider arrowhead
-
-    // Points for arrowhead triangle
-    let p1 = (end_x, end_y);
-    let p2 = (
-        end_x - arrow_size * (ux * angle.cos() + uy * angle.sin()),
-        end_y - arrow_size * (uy * angle.cos() - ux * angle.sin()),
-    );
-    let p3 = (
-        end_x - arrow_size * (ux * angle.cos() - uy * angle.sin()),
-        end_y - arrow_size * (uy * angle.cos() + ux * angle.sin()),
-    );
-
-    // Create path for arrowhead
-    let mut pb = PathBuilder::new();
-    pb.move_to(p1.0, p1.1);
-    pb.line_to(p2.0, p2.1);
-    pb.line_to(p3.0, p3.1);
-    pb.close();
-    let arrowhead = pb.finish().unwrap();
-
-    // Draw filled arrowhead
-    pixmap.fill_path(
-        &arrowhead,
-        &paint,
-        FillRule::Winding,
-        Transform::identity(),
-        None,
-    );
-}
 
 struct App {
     window: Option<Arc<Window>>,
     surface: Option<Surface<Arc<Window>, Arc<Window>>>,
     context: Option<Context<Arc<Window>>>,
-    colors: Vec<u32>,
-    squares: Vec<GameSquare>,
-    font: FontArc,
     cursor_position: (f64, f64),
-    arrows: Vec<(u32, u32)>,
+    game_state: GameState,
+    game_board: GameBoard,
 }
 
 impl App {
     fn new() -> Self {
-        // Define a list of u32 colors (RGBA format)
-        let colors = vec![
-            0xFF0066FF, // Blue
-            0xFF00AA00, // Green
-            0xFFFF0000, // Red
-            0xFFAA00AA, // Purple
-            0xFF00AAAA, // Cyan
-            0xFF0066FF, // Blue
-            0xFF00AA00, // Green
-            0xFFFF0000, // Red
-            0xFFAA00AA, // Purple
-            0xFF00AAAA, // Cyan
-        ];
-
-        // Load a font from a project-local file
-        // Ensure DejaVuSans.ttf is in your project directory
-        let font_data = include_bytes!("./DejaVuSans-Bold.ttf");
-        let font = FontArc::try_from_slice(font_data).expect("Failed to load font");
-        let squares = Vec::new();
-
-        // Generate pairs of points for arrows
-        let random_seed = generate_random_seed();
-        let arrows = generate_pairs(random_seed);
-
         Self {
             window: None,
             surface: None,
             context: None,
-            colors,
-            squares,
-            font,
             cursor_position: (0.0, 0.0),
-            arrows,
+            game_state: GameState::new(),
+            game_board: GameBoard::SquareBoard {
+                squares: vec![],
+                arrows: vec![],
+            },
         }
     }
 
@@ -346,65 +55,41 @@ impl App {
             let mut buffer = surface.buffer_mut().unwrap();
             let size = window.inner_size();
             let (width, height) = (size.width, size.height);
+
             let mut pixmap = Pixmap::new(width, height).unwrap();
 
             // Clear the pixmap with a white background
             pixmap.fill(Color::from_rgba8(255, 255, 255, 255));
 
             // Draw a 10x10 grid of squares
-            let grid_size = 10;
+            let board_size = cmp::min(width, height) as f32 * 0.9; // 80% of the smaller dimension
+            let board_padding = cmp::min(width, height) as f32 * 0.1; // 5%
+                                                                      //let grid_count = 10.0;
+            let grid_count = self.game_state.grid_size as f32;
+            let spacing = (board_size / grid_count) as f32 * 0.1;
+
             // Set grid height to 80% of window height
-            let grid_height = height as f32 * 0.8;
-            let square_scale = grid_height / (grid_size as f32 * 2.5); // Scale squares to fit
-            let spacing = grid_height / grid_size as f32; // Spacing based on grid height
+            //let grid_height = height as f32 * 0.8;
+            //let square_scale = grid_height / (grid_size as f32 * 2.5); // Scale squares to fit
+            //let spacing = grid_height / grid_size as f32; // Spacing based on grid height
 
             // Calculate offsets to center the grid
-            let grid_width = spacing * grid_size as f32;
-            let offset_x_start = (width as f32 - grid_width) / 2.0;
-            let offset_y_start = (height as f32 - grid_height) / 2.0;
+            //let grid_width = spacing * grid_size as f32;
+            //let offset_x_start = (width as f32 - grid_width) / 2.0;
+            //let offset_y_start = (height as f32 - grid_height) / 2.0;
 
-            for row in 0..grid_size {
-                for col in 0..grid_size {
-                    let square_number = 101 - (row * grid_size + col + 1); // Numbers 1 to 100
-                    let color = self.colors[(square_number - 1) % self.colors.len()];
-                    let offset_x = offset_x_start + col as f32 * spacing;
-                    let offset_y = offset_y_start + row as f32 * spacing;
+            self.game_board.init(
+                //let game_board =  self.game_board.new(
+                board_padding as i32,
+                board_size as i32,
+                grid_count as i32,
+                spacing as i32,
+                self.game_state.colors.clone(),
+                self.game_state.arrows.as_mut(),
+            );
 
-                    self.squares.push(GameSquare::new(
-                        square_number as u32,
-                        offset_x as i32,
-                        offset_y as i32,
-                        //(offset_x + offset_x_start) as u32,
-                        // (offset_y + offset_y_start) as u32,
-                        (square_scale * 2.0) as u32,
-                        (square_scale * 2.0) as u32,
-                        color,
-                    ));
-
-                    draw_square(
-                        &mut pixmap,
-                        color,
-                        square_scale,
-                        offset_x,
-                        offset_y,
-                        square_number as u32,
-                        &self.font,
-                    );
-                }
-            }
-
-            // Draw an arrow for each pair in points
-            for (start, end) in self.arrows.clone() {
-                draw_arrow(
-                    &mut pixmap,
-                    start,
-                    end,
-                    square_scale,
-                    offset_x_start,
-                    offset_y_start,
-                    spacing,
-                );
-            }
+            // Draw the game board
+            self.game_board.draw(&mut pixmap);
 
             // Copy pixmap to softbuffer
             for (i, pixel) in pixmap.pixels().iter().enumerate() {
@@ -426,7 +111,7 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_attributes = WindowAttributes::default()
             .with_title("The dynamic of life game")
-            .with_inner_size(winit::dpi::LogicalSize::new(800, 800));
+            .with_inner_size(winit::dpi::LogicalSize::new(1024, 800));
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
@@ -490,7 +175,37 @@ impl ApplicationHandler for App {
                 //println!( "Left mouse button pressed at: x={:.2}, y={:.2}", self.cursor_position.0, self.cursor_position.1);
 
                 // Check which rectangle was clicked
-                let mut found = false;
+                //let mut found = false;
+                //match &self
+                //    .game_board
+                match self
+                    .game_board
+                    .onclick(self.cursor_position.0, self.cursor_position.1)
+                {
+                    Some(square_number) => {
+                        println!("🎯 Clicked inside game square ID: {}", square_number)
+                    }
+                    None => println!("no"),
+                }
+
+                // TODO: Add game controls and redraw screen if the next button is clicked
+                /*
+                match &self
+                    .game_controls
+                    .onclick(self.cursor_position.0, self.cursor_position.1)
+                {
+                    Some(square_number) => {
+                        println!("🎯 Clicked inside game square ID: {}", square_number);
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                        //&self.window.request_redraw();
+                    }
+                    None => println!("no"),
+                }
+                */
+
+                /*
                 for square in &self.squares {
                     if square.contains_point(self.cursor_position.0, self.cursor_position.1) {
                         println!(
@@ -505,6 +220,7 @@ impl ApplicationHandler for App {
                 if !found {
                     println!("Clicked in empty space");
                 }
+                */
             }
 
             WindowEvent::KeyboardInput {
@@ -521,61 +237,6 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
-}
-
-fn generate_pairs(seed: BigInt) -> Vec<(u32, u32)> {
-    let seed_str = seed.to_string();
-
-    let num_pairs = ((&seed % BigInt::from(6)) + BigInt::from(5))
-        .to_string()
-        .parse::<u32>()
-        .unwrap_or(5)
-        .clamp(5, 10);
-
-    let mut pairs = Vec::new();
-
-    for i in 1..num_pairs + 1 {
-        let start = (i * 4) as usize;
-
-        if start + 4 > seed_str.len() {
-            break;
-        }
-
-        let chunk = &seed_str[start..start + 4];
-        let first = chunk[0..2].parse::<u32>().unwrap_or(1).max(1).min(100);
-        let second = chunk[2..4].parse::<u32>().unwrap_or(1).max(1).min(100);
-
-        let first_decade = first / 10;
-        let second_decade = second / 10;
-
-        let final_second = if first_decade != second_decade {
-            second
-        } else if second >= first {
-            (second + 10) % 100
-        } else {
-            (second.wrapping_sub(10)) % 100
-        };
-
-        pairs.push((first, final_second));
-    }
-
-    pairs
-}
-
-// Temporary auxiliraty function to generate a seed
-fn generate_random_seed() -> BigInt {
-    let mut rng = rand::rng();
-    let mut digits = String::new();
-
-    // First digit must be 1-9 to ensure 192 digits
-    digits.push_str(&rng.random_range(1..=9).to_string());
-
-    // Generate remaining 191 digits (0-9)
-    for _ in 0..191 {
-        digits.push_str(&rng.random_range(0..=9).to_string());
-    }
-
-    BigInt::from_str_radix(&digits, 10).expect("Invalid BigInt string")
 }
 
 fn main() {
