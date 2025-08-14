@@ -1,17 +1,6 @@
 use ab_glyph::{Font, FontArc, Glyph, PxScale};
-//use image::{DynamicImage, ImageReader, Rgba};
-//use image::{ImageReader, Rgba};
-//use std::sync::Arc;
+use image::DynamicImage;
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
-//use winit::window::Window;
-//use softbuffer::{Context, Surface};
-//use std::num::NonZeroU32;
-//use std::sync::Arc;
-//use winit::application::ApplicationHandler;
-//use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
-//use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-//use winit::keyboard::{Key, NamedKey};
-//use winit::window::{Window, WindowAttributes, WindowId};
 
 use crate::drawable::Drawable;
 
@@ -51,55 +40,6 @@ impl GameSquare {
             self.y + (self.size as f32 * 0.5),
         )
     }
-
-    // Function to draw a square with rounded corners
-    /*
-    fn draw_rounded_square(
-        pixmap: &mut Pixmap,
-        x: i32,
-        y: i32,
-        size: i32,
-        corner_radius: i32,
-        color: Color,
-    ) {
-        let size = size.max(2 * corner_radius); // Ensure size is at least twice the radius
-        let half_size = size / 2;
-
-        for py in y..(y + size) {
-            for px in x..(x + size) {
-                // Check if pixel is in one of the rounded corners
-                let in_corner = if px < x + corner_radius && py < y + corner_radius {
-                    // Top-left corner
-                    let dx = x + corner_radius - px;
-                    let dy = y + corner_radius - py;
-                    dx * dx + dy * dy > corner_radius * corner_radius
-                } else if px >= x + size - corner_radius && py < y + corner_radius {
-                    // Top-right corner
-                    let dx = px - (x + size - corner_radius - 1);
-                    let dy = y + corner_radius - py;
-                    dx * dx + dy * dy > corner_radius * corner_radius
-                } else if px < x + corner_radius && py >= y + size - corner_radius {
-                    // Bottom-left corner
-                    let dx = x + corner_radius - px;
-                    let dy = py - (y + size - corner_radius - 1);
-                    dx * dx + dy * dy > corner_radius * corner_radius
-                } else if px >= x + size - corner_radius && py >= y + size - corner_radius {
-                    // Bottom-right corner
-                    let dx = px - (x + size - corner_radius - 1);
-                    let dy = py - (y + size - corner_radius - 1);
-                    dx * dx + dy * dy > corner_radius * corner_radius
-                } else {
-                    false
-                };
-
-                // Draw pixel if it's inside the square and not in a rounded corner
-                if !in_corner && px >= x && px < x + size && py >= y && py < y + size {
-                    pixmap.set_pixel(px as u32, py as u32, color);
-                }
-            }
-        }
-    }
-    */
 }
 
 impl Drawable for GameSquare {
@@ -222,6 +162,55 @@ impl Drawable for GameSquare {
             );
         }
     }
+
+    // Function to draw a square with rounded corners
+    /*
+    pub fn draw_rounded(
+        pixmap: &mut Pixmap,
+        x: i32,
+        y: i32,
+        size: i32,
+        corner_radius: i32,
+        color: Color,
+    ) {
+        let size = size.max(2 * corner_radius); // Ensure size is at least twice the radius
+        let half_size = size / 2;
+
+        for py in y..(y + size) {
+            for px in x..(x + size) {
+                // Check if pixel is in one of the rounded corners
+                let in_corner = if px < x + corner_radius && py < y + corner_radius {
+                    // Top-left corner
+                    let dx = x + corner_radius - px;
+                    let dy = y + corner_radius - py;
+                    dx * dx + dy * dy > corner_radius * corner_radius
+                } else if px >= x + size - corner_radius && py < y + corner_radius {
+                    // Top-right corner
+                    let dx = px - (x + size - corner_radius - 1);
+                    let dy = y + corner_radius - py;
+                    dx * dx + dy * dy > corner_radius * corner_radius
+                } else if px < x + corner_radius && py >= y + size - corner_radius {
+                    // Bottom-left corner
+                    let dx = x + corner_radius - px;
+                    let dy = py - (y + size - corner_radius - 1);
+                    dx * dx + dy * dy > corner_radius * corner_radius
+                } else if px >= x + size - corner_radius && py >= y + size - corner_radius {
+                    // Bottom-right corner
+                    let dx = px - (x + size - corner_radius - 1);
+                    let dy = py - (y + size - corner_radius - 1);
+                    dx * dx + dy * dy > corner_radius * corner_radius
+                } else {
+                    false
+                };
+
+                // Draw pixel if it's inside the square and not in a rounded corner
+                if !in_corner && px >= x && px < x + size && py >= y && py < y + size {
+                    pixmap.set_pixel(px as u32, py as u32, color);
+                }
+            }
+        }
+    }
+    */
 }
 
 #[derive(Debug, Clone)]
@@ -351,101 +340,100 @@ impl Drawable for Arrow {
     }
 }
 
-/*
 #[derive(Debug, Clone)]
 pub struct Png {
     pub id: i32,
     //pub png_path: &str,
-    pub png_path: String,
-    pub x: i32,
-    pub y: i32,
-    pub window_width: u32,
-    pub window_height: u32,
+    //pub png_path: String,
+    pub img: DynamicImage,
+    pub png_width: u32,
+    pub png_height: u32,
+    pub png_pixels: Vec<u32>, // Store pixels in ARGB format
 }
 
 impl Png {
-    pub fn draw(&self, buffer: &Arc<Window>) {
-        println!(
-            "Drawing png from ({}, {}) to ({}, {}) with thickness {} and color {}",
-            self.x1, self.y1, self.x2, self.y2, self.thickness, self.color
-        );
+    pub fn new(id: i32) -> Self {
+        let png_bytes = include_bytes!("../player.png");
+        let img = image::load_from_memory(png_bytes).unwrap();
 
-        /*
-            buffer: &mut [u32],
-            png_path: &str,
-            x: i32,
-            y: i32,
-            window_width: u32,
-            window_height: u32,
-        ) -> Result<(), Box<dyn std::error::Error>> {
-        */
-        // Load the PNG image
-        //let img = ImageReader::open(self.png_path)?.decode()?;
-        let img = ImageReader::open(&self.png_path)?.decode()?;
-        let rgba_img = img.to_rgba8();
+        let rgba = img.to_rgba8();
+        let png_width = rgba.width();
+        let png_height = rgba.height();
 
-        let (img_width, img_height) = rgba_img.dimensions();
+        let png_pixels: Vec<u32> = rgba
+            .chunks_exact(4)
+            .map(|pixel| {
+                let [r, g, b, a] = [pixel[0], pixel[1], pixel[2], pixel[3]];
+                ((a as u32) << 24) | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+            })
+            .collect();
 
-        // Draw each pixel of the image
-        for img_y in 0..img_height {
-            for img_x in 0..img_width {
-                let pixel = rgba_img.get_pixel(img_x, img_y);
-                let Rgba([r, g, b, a]) = *pixel;
+        Png {
+            id,
+            img,
+            png_width,
+            png_height,
+            png_pixels,
+        }
+    }
 
-                // Skip transparent pixels
-                if a == 0 {
-                    continue;
-                }
+    pub fn draw(&self, buffer: &mut [u32], buffer_width: u32, buffer_height: u32, x: i32, y: i32) {
+        let buffer_width = buffer_width as i32;
+        let buffer_height = buffer_height as i32;
+        let png_width = self.png_width as i32;
+        let png_height = self.png_height as i32;
 
-                // Calculate position in the window buffer
-                let window_x = self.x + img_x as i32;
-                let window_y = self.y + img_y as i32;
+        // Calculate clipping bounds
+        let start_x = 0.max(-x);
+        let start_y = 0.max(-y);
+        let end_x = png_width.min(buffer_width - x);
+        let end_y = png_height.min(buffer_height - y);
 
-                // Check bounds
-                if window_x >= 0
-                    && window_y >= 0
-                    && window_x < self.window_width as i32
-                    && window_y < self.window_height as i32
+        // Copy pixels row by row
+        for src_y in start_y..end_y {
+            let dst_y = y + src_y;
+            if dst_y >= 0 {
+                let src_row_start = (src_y * png_width + start_x) as usize;
+                let dst_row_start = (dst_y * buffer_width + (x + start_x)) as usize;
+                let copy_width = (end_x - start_x) as usize;
+
+                if src_row_start < self.png_pixels.len()
+                    && dst_row_start < buffer.len()
+                    && src_row_start + copy_width <= self.png_pixels.len()
+                    && dst_row_start + copy_width <= buffer.len()
                 {
-                    let buffer_index =
-                        (window_y as u32 * self.window_width + window_x as u32) as usize;
+                    // Handle transparency - only draw non-transparent pixels
+                    for i in 0..copy_width {
+                        let src_pixel = self.png_pixels[src_row_start + i];
+                        let alpha = (src_pixel >> 24) & 0xFF;
 
-                    if buffer_index < buffer.len() {
-                        // Handle alpha blending (simple version)
-                        if a == 255 {
-                            // Fully opaque - just replace
-                            buffer[buffer_index] = ((a as u32) << 24)
-                                | ((r as u32) << 16)
-                                | ((g as u32) << 8)
-                                | (b as u32);
+                        if alpha == 0 {
+                            // Fully transparent - don't draw anything (leave buffer unchanged)
+                            continue;
+                        } else if alpha == 255 {
+                            // Fully opaque - direct copy
+                            buffer[dst_row_start + i] = src_pixel;
                         } else {
-                            // Semi-transparent - blend with existing pixel
-                            let existing = buffer[buffer_index];
-                            let existing_r = ((existing >> 16) & 0xFF) as u8;
-                            let existing_g = ((existing >> 8) & 0xFF) as u8;
-                            let existing_b = (existing & 0xFF) as u8;
+                            // Semi-transparent - blend with whatever is already in the buffer
+                            let bg = buffer[dst_row_start + i];
+                            let bg_r = (bg >> 16) & 0xFF;
+                            let bg_g = (bg >> 8) & 0xFF;
+                            let bg_b = bg & 0xFF;
 
-                            let alpha_f = a as f32 / 255.0;
-                            let inv_alpha = 1.0 - alpha_f;
+                            let fg_r = (src_pixel >> 16) & 0xFF;
+                            let fg_g = (src_pixel >> 8) & 0xFF;
+                            let fg_b = src_pixel & 0xFF;
 
-                            let new_r =
-                                ((r as f32 * alpha_f) + (existing_r as f32 * inv_alpha)) as u8;
-                            let new_g =
-                                ((g as f32 * alpha_f) + (existing_g as f32 * inv_alpha)) as u8;
-                            let new_b =
-                                ((b as f32 * alpha_f) + (existing_b as f32 * inv_alpha)) as u8;
+                            let inv_alpha = 255 - alpha;
+                            let r = (fg_r * alpha + bg_r * inv_alpha) / 255;
+                            let g = (fg_g * alpha + bg_g * inv_alpha) / 255;
+                            let b = (fg_b * alpha + bg_b * inv_alpha) / 255;
 
-                            buffer[buffer_index] = (0xFF << 24)
-                                | ((new_r as u32) << 16)
-                                | ((new_g as u32) << 8)
-                                | (new_b as u32);
+                            buffer[dst_row_start + i] = 0xFF000000 | (r << 16) | (g << 8) | b;
                         }
                     }
                 }
             }
         }
-
-        Ok(())
     }
 }
-*/
