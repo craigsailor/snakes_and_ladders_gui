@@ -7,7 +7,7 @@ pub mod objects;
 pub use crate::game_board::GameBoard;
 pub use drawable::Drawable;
 pub use game_state::GameState;
-pub use objects::{Arrow, GameSettings, GameSquare, User};
+pub use objects::{Arrow, GameSettings, GameSquare, Png, User};
 use std::cmp;
 
 //use crate::{Arrow, GameSettings, GameSquare, GameState, User};
@@ -49,6 +49,17 @@ impl App {
         }
     }
 
+    #[allow(unused_variables)]
+    fn get_sq_center(board: &GameBoard, sq_number: usize) -> Option<(f32, f32)> {
+        if let GameBoard::SquareBoard { squares, arrows } = board {
+            if let Some(square) = squares.get(sq_number) {
+                let center = square.center();
+                return Some(center);
+            }
+        }
+        None
+    }
+
     fn draw(&mut self) {
         if let (Some(window), Some(surface)) = (&self.window, &mut self.surface) {
             // Get the surface buffer and create a pixmap
@@ -67,6 +78,7 @@ impl App {
                                                                       //let grid_count = 10.0;
             let grid_count = self.game_state.grid_size as f32;
             let spacing = (board_size / grid_count) as f32 * 0.1;
+            let sq_size = (board_size / grid_count) - (spacing * 2.0);
 
             // Set grid height to 80% of window height
             //let grid_height = height as f32 * 0.8;
@@ -100,6 +112,19 @@ impl App {
                 buffer[i] =
                     ((a as u32) << 24) | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
             }
+
+            //let player = Png::new();
+            let player_position = Self::get_sq_center(&self.game_board, 0).unwrap_or((0.0, 0.0));
+
+            let player = Png::new(0);
+
+            player.draw(
+                &mut buffer,
+                width as u32,
+                height as u32,
+                (player_position.0 - sq_size / 2.0) as i32,
+                (player_position.1 - sq_size / 2.0) as i32,
+            );
 
             // Present the buffer
             buffer.present().unwrap();
@@ -185,7 +210,7 @@ impl ApplicationHandler for App {
                     Some(square_number) => {
                         println!("🎯 Clicked inside game square ID: {}", square_number)
                     }
-                    None => println!("no"),
+                    None => {}
                 }
 
                 // TODO: Add game controls and redraw screen if the next button is clicked
@@ -201,7 +226,7 @@ impl ApplicationHandler for App {
                         }
                         //&self.window.request_redraw();
                     }
-                    None => println!("no"),
+                    None => {}
                 }
                 */
 
