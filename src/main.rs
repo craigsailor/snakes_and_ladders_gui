@@ -10,7 +10,6 @@ pub use drawable::Drawable;
 pub use game_controls::{Button, GameControls};
 pub use game_state::GameState;
 pub use objects::{Arrow, GameSettings, GameSquare, Png, User};
-use rand::Rng;
 use std::cmp;
 
 //use crate::{Arrow, GameSettings, GameSquare, GameState, User};
@@ -225,12 +224,6 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => {
-                //println!( "Left mouse button pressed at: x={:.2}, y={:.2}", self.cursor_position.0, self.cursor_position.1);
-
-                // Check which rectangle was clicked
-                //let mut found = false;
-                //match &self
-                //    .game_board
                 match self
                     .game_board
                     .onclick(self.cursor_position.0, self.cursor_position.1)
@@ -246,7 +239,6 @@ impl ApplicationHandler for App {
                     None => {}
                 }
 
-                // TODO: Add game controls and redraw screen if the next button is clicked
                 match &self
                     .game_controls
                     .onclick(self.cursor_position.0, self.cursor_position.1)
@@ -255,7 +247,15 @@ impl ApplicationHandler for App {
                         match button_name.as_str() {
                             "Spin" => {
                                 self.game_state.spin();
-                                //self.game_state.advance_player(rand::rng().random_range(1..=5));
+                                for arrow in &self.game_state.arrows.clone() {
+                                    if &self.game_state.user_position == &arrow.0 {
+                                        println!(
+                                            "Landed at bottom of arrow on square {}. Moving to {}.",
+                                            arrow.0, arrow.1
+                                        );
+                                        self.game_state.move_player(arrow.1);
+                                    }
+                                }
                             }
                             "Mine" => {
                                 //self.game_state.mine();
@@ -266,7 +266,7 @@ impl ApplicationHandler for App {
                             }
                             _ => {}
                         }
-                        println!("🎯 Clicked inside button: {}", button_name);
+                        //println!("🎯 Clicked inside button: {}", button_name);
 
                         if let Some(window) = &self.window {
                             window.request_redraw();
@@ -274,23 +274,6 @@ impl ApplicationHandler for App {
                     }
                     None => {}
                 }
-
-                /*
-                for square in &self.squares {
-                    if square.contains_point(self.cursor_position.0, self.cursor_position.1) {
-                        println!(
-                            "🎯 Clicked inside game square ID: {} (pos: {},{}, size: {}x{})",
-                            square.id, square.x, square.y, square.width, square.height
-                        );
-                        found = true;
-                        break; // Only report the first (topmost) rectangle
-                    }
-                }
-
-                if !found {
-                    println!("Clicked in empty space");
-                }
-                */
             }
 
             WindowEvent::KeyboardInput {
