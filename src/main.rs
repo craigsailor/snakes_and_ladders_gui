@@ -1,13 +1,16 @@
 pub mod drawable;
 pub mod game_board;
+pub mod game_controls;
 pub mod game_state;
 pub mod objects;
 
 // Re-export commonly used items for convenience
 pub use crate::game_board::GameBoard;
 pub use drawable::Drawable;
+pub use game_controls::{Button, GameControls};
 pub use game_state::GameState;
 pub use objects::{Arrow, GameSettings, GameSquare, Png, User};
+use rand::Rng;
 use std::cmp;
 
 //use crate::{Arrow, GameSettings, GameSquare, GameState, User};
@@ -32,6 +35,7 @@ struct App {
     cursor_position: (f64, f64),
     game_state: GameState,
     game_board: GameBoard,
+    game_controls: GameControls,
 }
 
 impl App {
@@ -46,6 +50,7 @@ impl App {
                 squares: vec![],
                 arrows: vec![],
             },
+            game_controls: GameControls::new(),
         }
     }
 
@@ -100,8 +105,26 @@ impl App {
                 self.game_state.arrows.as_mut(),
             );
 
+            let button_list = vec![
+                Button::new("Spin".to_string(), 0x00CC00FF),
+                Button::new("Mine".to_string(), 0xCC0000FF),
+                Button::new("Reset".to_string(), 0x0000CCFF),
+            ];
+
+            self.game_controls.configure(
+                //cmp::max(width, height) as f32 + board_padding,
+                board_size + board_padding,
+                board_padding,
+                width as f32 - board_size - (board_padding * 2.0),
+                height as f32 - (board_padding * 2.0),
+                0xCCCCCC0F,
+                "The Game".to_string(),
+                button_list,
+            );
+
             // Draw the game board
             self.game_board.draw(&mut pixmap);
+            self.game_controls.draw(&mut pixmap);
 
             // Copy pixmap to softbuffer
             for (i, pixel) in pixmap.pixels().iter().enumerate() {
@@ -114,7 +137,11 @@ impl App {
             }
 
             //let player = Png::new();
-            let player_position = Self::get_sq_center(&self.game_board, 0).unwrap_or((0.0, 0.0));
+            let player_position = Self::get_sq_center(
+                &self.game_board,
+                (self.game_state.user_position - 1) as usize,
+            )
+            .unwrap_or((0.0, 0.0));
 
             let player = Png::new(0);
 
@@ -124,6 +151,7 @@ impl App {
                 height as u32,
                 (player_position.0 - sq_size / 2.0) as i32,
                 (player_position.1 - sq_size / 2.0) as i32,
+                !get_range_flag(self.game_state.user_position, grid_count as u32),
             );
 
             // Present the buffer
@@ -208,27 +236,44 @@ impl ApplicationHandler for App {
                     .onclick(self.cursor_position.0, self.cursor_position.1)
                 {
                     Some(square_number) => {
-                        println!("🎯 Clicked inside game square ID: {}", square_number)
+                        println!("🎯 Clicked inside game square ID: {}", square_number);
+                        //self.game_state.move_player(square_number);
+                        //self.game_state.advance_player(rand::rng().random_range(1..=5));
+                        //if let Some(window) = &self.window {
+                        //    window.request_redraw();
+                        // }
                     }
                     None => {}
                 }
 
                 // TODO: Add game controls and redraw screen if the next button is clicked
-                /*
                 match &self
                     .game_controls
                     .onclick(self.cursor_position.0, self.cursor_position.1)
                 {
-                    Some(square_number) => {
-                        println!("🎯 Clicked inside game square ID: {}", square_number);
+                    Some(button_name) => {
+                        match button_name.as_str() {
+                            "Spin" => {
+                                self.game_state.spin();
+                                //self.game_state.advance_player(rand::rng().random_range(1..=5));
+                            }
+                            "Mine" => {
+                                //self.game_state.mine();
+                            }
+                            "Reset" => {
+                                self.game_state.reset();
+                                self.game_board.reset();
+                            }
+                            _ => {}
+                        }
+                        println!("🎯 Clicked inside button: {}", button_name);
+
                         if let Some(window) = &self.window {
                             window.request_redraw();
                         }
-                        //&self.window.request_redraw();
                     }
                     None => {}
                 }
-                */
 
                 /*
                 for square in &self.squares {
@@ -262,6 +307,25 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
+}
+
+// TODO: Make this generalized for any range not just a grid of 10
+/*
+fn get_range_flag(n: u32) -> bool {
+    if n < 1 {
+        return false;
+    } // Handle invalid input (optional)
+    let mod_value = (n - 1) % 20;
+    mod_value < 10
+}
+*/
+
+fn get_range_flag(n: u32, range_size: u32) -> bool {
+    if n < 1 || range_size < 1 {
+        return false;
+    } // Handle invalid input
+    let mod_value = (n - 1) % (2 * range_size);
+    mod_value < range_size
 }
 
 fn main() {

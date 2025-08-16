@@ -67,8 +67,9 @@ impl GameBoard {
                     for row in 0..grid_count {
                         let sq_id = row + (col * grid_count) + 1;
                         let sq_y = board_size
+                            - spacing
                             - (col * sq_size + (spacing * col) + spacing)
-                            - board_padding;
+                            - board_padding / 2;
                         let sq_x = (sq_size * row)
                             + (spacing * row)
                             + spacing
@@ -100,6 +101,19 @@ impl GameBoard {
             }
             GameBoard::EinsteinTileBoard { tiles, arrows } => {}
             _ => panic!("Unknown board type"),
+        }
+    }
+
+    pub fn reset(&mut self) {
+        match self {
+            GameBoard::SquareBoard { squares, arrows } => {
+                squares.clear();
+                arrows.clear();
+            }
+            GameBoard::EinsteinTileBoard { tiles, arrows } => {
+                tiles.clear();
+                arrows.clear();
+            }
         }
     }
 

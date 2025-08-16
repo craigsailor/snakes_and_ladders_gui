@@ -24,6 +24,7 @@ pub struct GameState {
     pub colors: Vec<u32>,
     //pub board_type: GameBoard,
     pub grid_size: u32,
+    pub user_position: u32,
 }
 
 impl GameState {
@@ -56,8 +57,36 @@ impl GameState {
             },
             colors: colors,
             //board_type: GameBoard::SquareBoard,
-            grid_size: 10, // Default board size
+            grid_size: 10,    // Default board size
+            user_position: 1, // Default user position (starting square)
         }
+    }
+
+    pub fn move_player(&mut self, new_square: u32) {
+        // Placeholder for player movement logic
+        println!("Moving user to square {}", new_square);
+        self.user_position = new_square;
+    }
+
+    pub fn advance_player(&mut self, count: u32) {
+        if self.user_position + count <= (self.grid_size * self.grid_size) {
+            self.user_position = self.user_position.wrapping_add(count);
+        }
+    }
+
+    pub fn spin(&mut self) {
+        self.advance_player(rand::rng().random_range(1..=5));
+    }
+
+    pub fn reset(&mut self) {
+        // Reset the game state to initial values
+        self.arrows.clear();
+        let random_seed = Self::generate_random_seed();
+        self.settings.game_id = random_seed.clone(); // Reset game ID to a new random seed
+        let new_arrows = Self::generate_arrow_pairs(random_seed.clone());
+        self.arrows = new_arrows;
+
+        self.user_position = 1; // Default user position (starting square)
     }
 
     // Temporary auxiliraty function to generate a seed
