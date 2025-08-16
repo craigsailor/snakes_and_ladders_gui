@@ -18,6 +18,7 @@ pub struct GameSettings {
     pub max_players: u32,
 }
 
+// Main game data container
 impl Default for GameSettings {
     fn default() -> Self {
         Self {

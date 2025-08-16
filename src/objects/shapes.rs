@@ -377,59 +377,71 @@ impl Png {
         }
     }
 
-    pub fn draw(&self, buffer: &mut [u32], buffer_width: u32, buffer_height: u32, x: i32, y: i32) {
-        let buffer_width = buffer_width as i32;
-        let buffer_height = buffer_height as i32;
-        let png_width = self.png_width as i32;
-        let png_height = self.png_height as i32;
+    pub fn draw(
+        &self,
+        buffer: &mut [u32],
+        buffer_width: u32,
+        buffer_height: u32,
+        x: i32,
+        y: i32,
+        flip_horizontal: bool,
+    ) {
+        let buffer_width: i32 = buffer_width as i32;
+        let buffer_height: i32 = buffer_height as i32;
+        let png_width: i32 = self.png_width as i32;
+        let png_height: i32 = self.png_height as i32;
 
         // Calculate clipping bounds
-        let start_x = 0.max(-x);
-        let start_y = 0.max(-y);
-        let end_x = png_width.min(buffer_width - x);
-        let end_y = png_height.min(buffer_height - y);
+        let start_x: i32 = 0.max(-x);
+        let start_y: i32 = 0.max(-y);
+        let end_x: i32 = png_width.min(buffer_width - x);
+        let end_y: i32 = png_height.min(buffer_height - y);
 
         // Copy pixels row by row
         for src_y in start_y..end_y {
-            let dst_y = y + src_y;
-            if dst_y >= 0 {
-                let src_row_start = (src_y * png_width + start_x) as usize;
-                let dst_row_start = (dst_y * buffer_width + (x + start_x)) as usize;
-                let copy_width = (end_x - start_x) as usize;
+            let dst_y: i32 = y + src_y;
+            if dst_y >= 0 && dst_y < buffer_height {
+                // Handle transparency - only draw non-transparent pixels
+                for dst_x_offset in 0..(end_x - start_x) {
+                    let dst_x = x + start_x + dst_x_offset;
 
-                if src_row_start < self.png_pixels.len()
-                    && dst_row_start < buffer.len()
-                    && src_row_start + copy_width <= self.png_pixels.len()
-                    && dst_row_start + copy_width <= buffer.len()
-                {
-                    // Handle transparency - only draw non-transparent pixels
-                    for i in 0..copy_width {
-                        let src_pixel = self.png_pixels[src_row_start + i];
-                        let alpha = (src_pixel >> 24) & 0xFF;
+                    let src_x = if flip_horizontal {
+                        // When flipping, map destination x to flipped source x
+                        png_width - 1 - (start_x + dst_x_offset)
+                    } else {
+                        start_x + dst_x_offset
+                    };
 
-                        if alpha == 0 {
-                            // Fully transparent - don't draw anything (leave buffer unchanged)
-                            continue;
-                        } else if alpha == 255 {
-                            // Fully opaque - direct copy
-                            buffer[dst_row_start + i] = src_pixel;
-                        } else {
-                            // Semi-transparent - blend with whatever is already in the buffer
-                            let bg = buffer[dst_row_start + i];
-                            let bg_r = (bg >> 16) & 0xFF;
-                            let bg_g = (bg >> 8) & 0xFF;
-                            let bg_b = bg & 0xFF;
+                    // Bounds checking
+                    if src_x >= 0 && src_x < png_width && dst_x >= 0 && dst_x < buffer_width {
+                        let src_idx = (src_y * png_width + src_x) as usize;
+                        let dst_idx = (dst_y * buffer_width + dst_x) as usize;
 
-                            let fg_r = (src_pixel >> 16) & 0xFF;
-                            let fg_g = (src_pixel >> 8) & 0xFF;
-                            let fg_b = src_pixel & 0xFF;
+                        if src_idx < self.png_pixels.len() && dst_idx < buffer.len() {
+                            let src_pixel: u32 = self.png_pixels[src_idx];
+                            let alpha: u32 = (src_pixel >> 24) & 0xFF;
 
-                            let inv_alpha = 255 - alpha;
-                            let r = (fg_r * alpha + bg_r * inv_alpha) / 255;
-                            let g = (fg_g * alpha + bg_g * inv_alpha) / 255;
-                            let b = (fg_b * alpha + bg_b * inv_alpha) / 255;
-
-                            buffer[dst_row_start + i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                            if alpha == 0 {
+                                // Fully transparent - don't draw anything
+                                continue;
+                            } else if alpha == 255 {
+                                // Fully opaque - direct copy
+                                buffer[dst_idx] = src_pixel;
+                            } else {
+                                // Semi-transparent - blend with existing pixel
+                                let bg: u32 = buffer[dst_idx];
+                                let bg_r: u32 = (bg >> 16) & 0xFF;
+                                let bg_g: u32 = (bg >> 8) & 0xFF;
+                                let bg_b: u32 = bg & 0xFF;
+                                let fg_r: u32 = (src_pixel >> 16) & 0xFF;
+                                let fg_g: u32 = (src_pixel >> 8) & 0xFF;
+                                let fg_b: u32 = src_pixel & 0xFF;
+                                let inv_alpha: u32 = 255 - alpha;
+                                let r: u32 = (fg_r * alpha + bg_r * inv_alpha) / 255;
+                                let g: u32 = (fg_g * alpha + bg_g * inv_alpha) / 255;
+                                let b: u32 = (fg_b * alpha + bg_b * inv_alpha) / 255;
+                                buffer[dst_idx] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                            }
                         }
                     }
                 }
