@@ -43,39 +43,24 @@ impl GameBoard {
 
                 println!(
                     "Initializing SquareBoard with board size: {}, grid_size: {}, spacing: {}, arrows: {}",
-                    board_size, grid_count, spacing, arrows.len()
+                    board_size, grid_count, spacing, added_arrows.len()
                 );
-
-                /*
-                let colors = vec![
-                    0x0066FF6F, // Blue
-                    0x00AA006F, // Green
-                    0xFF00006F, // Red
-                    0xAA00AA6F, // Purple
-                    0x00AAAA6F, // Cyan
-                    0x0066FF6F, // Blue
-                    0x00AA006F, // Green
-                    0xFF00006F, // Red
-                    0xAA00AA6F, // Purple
-                    0x00AAAA6F, // Cyan
-                ];
-                */
 
                 let sq_size = (board_size / grid_count) - (spacing * 2);
 
                 for col in 0..grid_count {
                     for row in 0..grid_count {
                         let sq_id = row + (col * grid_count) + 1;
-                        let sq_y = board_size
-                            - spacing
-                            - (col * sq_size + (spacing * col) + spacing)
-                            - board_padding / 2;
+                        let sq_y = board_padding + (grid_count - col) * (sq_size + spacing)
+                            - (sq_size + spacing);
+
                         let sq_x = (sq_size * row)
                             + (spacing * row)
                             + spacing
                             + board_padding
                             + (col % 2)
-                                * ((9 - row) * (sq_size + spacing) - (row * (sq_size + spacing)));
+                                * ((grid_count - 1 - row) * (sq_size + spacing)
+                                    - (row * (sq_size + spacing)));
 
                         squares.push(GameSquare::new(
                             sq_id as u32,

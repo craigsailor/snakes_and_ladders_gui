@@ -16,7 +16,6 @@ pub struct GameState {
     // Drawable objects stored as trait objects
     //pub drawable_objects: Vec<Box<dyn Drawable>>,
     pub arrows: Vec<(u32, u32)>, // Pairs of arrows
-    key_counter: u32,
 
     // Non-drawable objects
     pub users: HashMap<u32, User>,
@@ -47,7 +46,6 @@ impl GameState {
 
         Self {
             arrows: arrows, // Initialize with an empty vector
-            key_counter: 0,
             users: HashMap::new(),
             settings: GameSettings {
                 game_id: Self::generate_random_seed(), // Randomly generated or assigned
