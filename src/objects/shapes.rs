@@ -377,6 +377,110 @@ impl Png {
         }
     }
 
+    pub fn draw_png_scaled_height(
+        &self,
+        buffer: &mut [u32],
+        buffer_width: u32,
+        x: i32,
+        y: i32,
+        target_height: u32,
+        flip_horizontal: bool,
+    ) {
+        if target_height == 0 {
+            return;
+        }
+
+        // Calculate scale factor based on target height
+        let scale = target_height as f32 / self.png_height as f32;
+        let scaled_width = (self.png_width as f32 * scale) as u32;
+        let scaled_height = target_height;
+
+        self.draw_png_scaled(
+            buffer,
+            buffer_width,
+            x,
+            y,
+            scaled_width,
+            scaled_height,
+            flip_horizontal,
+        );
+    }
+    fn draw_png_scaled(
+        &self,
+        buffer: &mut [u32],
+        buffer_width: u32,
+        x: i32,
+        y: i32,
+        target_width: u32,
+        target_height: u32,
+        flip_horizontal: bool,
+    ) {
+        let buffer_width = buffer_width as i32;
+        let target_width = target_width as i32;
+        let target_height = target_height as i32;
+        let png_width = self.png_width as f32;
+        let png_height = self.png_height as f32;
+
+        // Calculate clipping bounds for the scaled image
+        let start_x = 0.max(-x);
+        let start_y = 0.max(-y);
+        let end_x = target_width.min(buffer_width - x);
+        let end_y = target_height.min((buffer.len() as i32) / buffer_width - y);
+
+        // Draw scaled pixels
+        for dst_y in start_y..end_y {
+            for dst_x in start_x..end_x {
+                // Map destination pixel back to source pixel
+                let src_x = if flip_horizontal {
+                    // Flip horizontally: rightmost dst_x maps to leftmost src pixel
+                    ((target_width - 1 - dst_x) as f32 / target_width as f32) * png_width
+                } else {
+                    (dst_x as f32 / target_width as f32) * png_width
+                };
+                let src_y = (dst_y as f32 / target_height as f32) * png_height;
+
+                // Use nearest neighbor sampling (you could implement bilinear for better quality)
+                let src_x = src_x as u32;
+                let src_y = src_y as u32;
+
+                if src_x < self.png_width && src_y < self.png_height {
+                    let src_index = (src_y * self.png_width + src_x) as usize;
+                    let dst_index = ((y + dst_y) * buffer_width + (x + dst_x)) as usize;
+
+                    if src_index < self.png_pixels.len() && dst_index < buffer.len() {
+                        let src_pixel = self.png_pixels[src_index];
+                        let alpha = (src_pixel >> 24) & 0xFF;
+
+                        if alpha == 0 {
+                            // Fully transparent - don't draw
+                            continue;
+                        } else if alpha == 255 {
+                            // Fully opaque - direct copy
+                            buffer[dst_index] = src_pixel;
+                        } else {
+                            // Semi-transparent - blend
+                            let bg = buffer[dst_index];
+                            let bg_r = (bg >> 16) & 0xFF;
+                            let bg_g = (bg >> 8) & 0xFF;
+                            let bg_b = bg & 0xFF;
+
+                            let fg_r = (src_pixel >> 16) & 0xFF;
+                            let fg_g = (src_pixel >> 8) & 0xFF;
+                            let fg_b = src_pixel & 0xFF;
+
+                            let inv_alpha = 255 - alpha;
+                            let r = (fg_r * alpha + bg_r * inv_alpha) / 255;
+                            let g = (fg_g * alpha + bg_g * inv_alpha) / 255;
+                            let b = (fg_b * alpha + bg_b * inv_alpha) / 255;
+
+                            buffer[dst_index] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn draw(
         &self,
         buffer: &mut [u32],

@@ -24,6 +24,7 @@ pub struct GameState {
     //pub board_type: GameBoard,
     pub grid_size: u32,
     pub user_position: u32,
+    pub new_game: bool,
 }
 
 impl GameState {
@@ -57,6 +58,7 @@ impl GameState {
             //board_type: GameBoard::SquareBoard,
             grid_size: 10,    // Default board size
             user_position: 1, // Default user position (starting square)
+            new_game: true,   // Default user position (starting square)
         }
     }
 
@@ -67,6 +69,10 @@ impl GameState {
     }
 
     pub fn advance_player(&mut self, count: u32) {
+        if self.new_game {
+            self.user_position = 0;
+            self.new_game = false; // Set to false after the first move
+        }
         if self.user_position + count <= (self.grid_size * self.grid_size) {
             self.user_position = self.user_position.wrapping_add(count);
         }
@@ -78,6 +84,7 @@ impl GameState {
 
     pub fn reset(&mut self) {
         // Reset the game state to initial values
+        self.new_game = true; // Reset new game flag
         self.arrows.clear();
         let random_seed = Self::generate_random_seed();
         self.settings.game_id = random_seed.clone(); // Reset game ID to a new random seed
