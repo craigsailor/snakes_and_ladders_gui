@@ -6,7 +6,7 @@ use curv::arithmetic::Converter;
 use curv::BigInt;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+//use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 
@@ -18,12 +18,12 @@ pub struct GameState {
     pub arrows: Vec<(u32, u32)>, // Pairs of arrows
 
     // Non-drawable objects
-    pub users: HashMap<u32, User>,
+    pub users: Vec<User>,
     pub settings: GameSettings,
     pub colors: Vec<u32>,
     //pub board_type: GameBoard,
     pub grid_size: u32,
-    pub user_position: u32,
+    //pub user_position: u32,
     pub new_game: bool,
 }
 
@@ -47,7 +47,18 @@ impl GameState {
 
         Self {
             arrows: arrows, // Initialize with an empty vector
-            users: HashMap::new(),
+            users: vec![
+                User::new(
+                    0,                      // Default user ID
+                    "Player 1".to_string(), // Default user name
+                    1,                      // Starting position
+                ),
+                User::new(
+                    1,                      // Default user ID
+                    "Player 2".to_string(), // Default user name
+                    1,                      // Starting position
+                ),
+            ],
             settings: GameSettings {
                 game_id: Self::generate_random_seed(), // Randomly generated or assigned
                 difficulty: "Normal".to_string(),
@@ -56,30 +67,42 @@ impl GameState {
             },
             colors: colors,
             //board_type: GameBoard::SquareBoard,
-            grid_size: 10,    // Default board size
-            user_position: 1, // Default user position (starting square)
-            new_game: true,   // Default user position (starting square)
+            grid_size: 10, // Default board size
+            //user_position: 1, // Default user position (starting square)
+            new_game: true, // Default user position (starting square)
         }
     }
 
-    pub fn move_player(&mut self, new_square: u32) {
+    pub fn move_player(&mut self, new_square: u32, player_id: i32) {
         // Placeholder for player movement logic
         println!("Moving user to square {}", new_square);
-        self.user_position = new_square;
+        self.users[player_id as usize].position = new_square;
     }
 
-    pub fn advance_player(&mut self, count: u32) {
+    pub fn advance_player(&mut self, count: u32, player_id: i32) {
         if self.new_game {
-            self.user_position = 0;
+            self.users[player_id as usize].position = 0;
             self.new_game = false; // Set to false after the first move
         }
-        if self.user_position + count <= (self.grid_size * self.grid_size) {
-            self.user_position = self.user_position.wrapping_add(count);
+
+        if self.users[player_id as usize].position + count <= (self.grid_size * self.grid_size) {
+            self.users[player_id as usize].position =
+                self.users[player_id as usize].position.wrapping_add(count);
+        }
+
+        for arrow in &self.arrows {
+            if &self.users[player_id as usize].position == &arrow.0 {
+                println!(
+                    "Landed at bottom of arrow on square {}. Moving to {}.",
+                    arrow.0, arrow.1
+                );
+                self.users[player_id as usize].position = arrow.1;
+            }
         }
     }
 
-    pub fn spin(&mut self) {
-        self.advance_player(rand::rng().random_range(1..=5));
+    pub fn spin(&mut self, player_id: i32) {
+        self.advance_player(rand::rng().random_range(1..=5), player_id);
     }
 
     pub fn reset(&mut self) {
@@ -91,7 +114,10 @@ impl GameState {
         let new_arrows = Self::generate_arrow_pairs(random_seed.clone());
         self.arrows = new_arrows;
 
-        self.user_position = 1; // Default user position (starting square)
+        for user in &mut self.users {
+            user.position = 1; // Reset each user's state
+        }
+        //self.user_position = 1; // Default user position (starting square)
     }
 
     // Temporary auxiliraty function to generate a seed
@@ -149,6 +175,7 @@ impl GameState {
 
     #[allow(dead_code)]
     //fn insert_with_auto_key(map: &mut HashMap<u32, String>, value: &str, counter: &mut u32) {
+    /*
     fn insert_with_auto_key(
         map: &mut HashMap<u32, String>,
         //value: Box<dyn User>,
@@ -166,19 +193,18 @@ impl GameState {
     }
 
     // Draw all drawable objects
-    /*
     pub fn draw_all(&self) {
         println!("Drawing all objects:");
         for drawable in &self.drawable_objects {
             drawable.draw();
         }
     }
-    */
 
     // Get user by ID
     pub fn get_user(&self, user_id: u32) -> Option<&User> {
         self.users.get(&user_id)
     }
+    */
 
     // Update game settings
     pub fn update_settings(&mut self, settings: GameSettings) {
