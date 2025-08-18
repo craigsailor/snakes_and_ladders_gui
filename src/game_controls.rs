@@ -129,7 +129,7 @@ impl GameControls {
 
         // Calculate text position (center it in the square)
         let text_x = self.x + text_size * 0.2;
-        let text_y = self.y + self.width * 0.1 + text_size * 0.5;
+        let text_y = self.y + text_size;
 
         // Create a path for the text
         let mut text_path = PathBuilder::new();

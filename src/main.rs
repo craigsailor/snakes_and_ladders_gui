@@ -114,7 +114,10 @@ impl App {
                 //cmp::max(width, height) as f32 + board_padding,
                 board_size + board_padding,
                 board_padding,
-                width as f32 - board_size - (board_padding * 2.0),
+                cmp::min(
+                    (width as f32 - board_size - (board_padding * 2.0)) as i32,
+                    (sq_size * 3.0) as i32,
+                ) as f32,
                 height as f32 - (board_padding * 2.0),
                 0xCCCCCC0F,
                 "The Game".to_string(),
