@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct User {
     pub user_id: u32,
     pub name: String,
-    pub score: i32,
+    pub position: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -26,6 +26,16 @@ impl Default for GameSettings {
             difficulty: "Normal".to_string(),
             sound_enabled: true,
             max_players: 4,
+        }
+    }
+}
+
+impl User {
+    pub fn new(user_id: u32, name: String, position: u32) -> Self {
+        Self {
+            user_id,
+            name,
+            position,
         }
     }
 }

@@ -4,6 +4,15 @@ use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
 
 use crate::drawable::Drawable;
 
+// Load player images
+macro_rules! load_images {
+    () => {{
+        let img1 = include_bytes!("../img/player-001.png");
+        let img2 = include_bytes!("../img/player-002.png");
+        vec![img1.as_slice(), img2.as_slice()]
+    }};
+}
+
 // Drawable objects
 #[derive(Debug, Clone)]
 pub struct GameSquare {
@@ -352,9 +361,11 @@ pub struct Png {
 }
 
 impl Png {
-    pub fn new(id: i32) -> Self {
-        let png_bytes = include_bytes!("../player.png");
-        let img = image::load_from_memory(png_bytes).unwrap();
+    pub fn new(id: i32, img_num: usize) -> Self {
+        let player_img = load_images!();
+
+        //let png_bytes = include_bytes!("../player.png");
+        let img = image::load_from_memory(player_img[img_num]).unwrap();
 
         let rgba = img.to_rgba8();
         let png_width = rgba.width();

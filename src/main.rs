@@ -35,6 +35,7 @@ struct App {
     game_state: GameState,
     game_board: GameBoard,
     game_controls: GameControls,
+    first_called: bool,
 }
 
 impl App {
@@ -50,7 +51,24 @@ impl App {
                 arrows: vec![],
             },
             game_controls: GameControls::new(),
+            first_called: false,
         }
+    }
+
+    fn take_a_turn(&mut self) {
+        if self.first_called {
+            // If first_called is true, we are already in the middle of a turn
+            return;
+        }
+        // Player 0 spins immediately
+        self.first_called = true; // Set to true to indicate a turn is in progress
+                                  //println!("Taking a turn...player 1");
+        self.game_state.spin(0);
+
+        // Player 1 spins after delay
+        //println!("Taking a turn...player 2");
+        self.game_state.spin(1);
+        self.first_called = false; // Set to true to indicate a turn is in progress
     }
 
     #[allow(unused_variables)]
@@ -139,27 +157,32 @@ impl App {
                     ((a as u32) << 24) | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
             }
 
-            //let player = Png::new();
-            let mut player_position = Self::get_sq_center(
-                &self.game_board,
-                (self.game_state.user_position - 1) as usize,
-            )
-            .unwrap_or((0.0, 0.0));
+            for player_num in 0..self.game_state.users.len() {
+                //let player = Png::new();
+                let mut player_position = Self::get_sq_center(
+                    &self.game_board,
+                    (self.game_state.users[player_num].position - 1) as usize,
+                )
+                .unwrap_or((0.0, 0.0));
 
-            let player = Png::new(0);
+                let player = Png::new(player_num as i32, player_num as usize);
 
-            if self.game_state.new_game {
-                player_position.0 = player_position.0 - sq_size;
+                if self.game_state.new_game {
+                    player_position.0 = player_position.0 - sq_size;
+                }
+
+                player.draw_png_scaled_height(
+                    &mut buffer,
+                    width as u32,
+                    (player_position.0 - sq_size / 2.0) as i32,
+                    (player_position.1 - sq_size / 2.0) as i32,
+                    (sq_size * 0.9) as u32,
+                    !get_range_flag(
+                        self.game_state.users[player_num].position,
+                        grid_count as u32,
+                    ),
+                );
             }
-
-            player.draw_png_scaled_height(
-                &mut buffer,
-                width as u32,
-                (player_position.0 - sq_size / 2.0) as i32,
-                (player_position.1 - sq_size / 2.0) as i32,
-                (sq_size * 0.9) as u32,
-                !get_range_flag(self.game_state.user_position, grid_count as u32),
-            );
 
             // Present the buffer
             buffer.present().unwrap();
@@ -238,11 +261,6 @@ impl ApplicationHandler for App {
                 {
                     Some(square_number) => {
                         println!("🎯 Clicked inside game square ID: {}", square_number);
-                        //self.game_state.move_player(square_number);
-                        //self.game_state.advance_player(rand::rng().random_range(1..=5));
-                        //if let Some(window) = &self.window {
-                        //    window.request_redraw();
-                        // }
                     }
                     None => {}
                 }
@@ -254,7 +272,9 @@ impl ApplicationHandler for App {
                     Some(button_name) => {
                         match button_name.as_str() {
                             "Spin" => {
-                                self.game_state.spin();
+                                self.take_a_turn();
+                                //self.game_state.spin();
+                                /*
                                 for arrow in &self.game_state.arrows.clone() {
                                     if &self.game_state.user_position == &arrow.0 {
                                         println!(
@@ -264,6 +284,7 @@ impl ApplicationHandler for App {
                                         self.game_state.move_player(arrow.1);
                                     }
                                 }
+                                */
                             }
                             "Mine" => {
                                 //self.game_state.mine();
