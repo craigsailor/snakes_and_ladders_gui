@@ -12,6 +12,7 @@ pub struct GameControls {
     pub height: f32,
     pub bg_color: u32, // ARGB format
     pub title: String,
+    pub button_height: f32,
     pub buttons: Vec<Button>,
 }
 
@@ -24,6 +25,7 @@ impl GameControls {
             height: 0.0,
             bg_color: 0xFFFFFFFF, // Default to white background
             title: String::from("Game Controls"),
+            button_height: 0.0,
             buttons: Vec::new(),
         }
     }
@@ -36,6 +38,7 @@ impl GameControls {
         height: f32,
         bg_color: u32, // ARGB format
         title: String,
+        button_height: f32,
         buttons: Vec<Button>,
     ) {
         self.x = x;
@@ -44,6 +47,7 @@ impl GameControls {
         self.height = height;
         self.bg_color = bg_color;
         self.title = title;
+        self.button_height = button_height;
         self.buttons = buttons;
     }
 
@@ -105,7 +109,7 @@ impl GameControls {
         stroke_paint.anti_alias = true;
 
         // Draw the outline
-        let stroke_width = self.width * 0.02; // Adjust stroke width relative to size
+        let stroke_width = 2.5; // Adjust stroke width relative to size
         pixmap.stroke_path(
             &path,
             &stroke_paint,
@@ -121,12 +125,11 @@ impl GameControls {
 
         // Render the square label using ab_glyph and tiny_skia
         let text = &self.title;
-        let text_size = self.width * 0.15; // Adjust text size relative to square size
+        let text_size = self.button_height * 0.8; // Adjust text size relative to square size
 
         // Calculate text position (center it in the square)
-        let text_x = self.x + self.width * 0.1;
+        let text_x = self.x + text_size * 0.2;
         let text_y = self.y + self.width * 0.1 + text_size * 0.5;
-        //let text_y = self.y + self.size * 0.9;
 
         // Create a path for the text
         let mut text_path = PathBuilder::new();
@@ -177,14 +180,13 @@ impl GameControls {
         // Draw each button
         //for button in &mut self.buttons {
         for indx in 0..self.buttons.len() {
-            let y_offset = (self.height * 0.1) * 0.8 * indx as f32;
-            self.buttons[indx].set_start(
-                self.x + self.width * 0.05,
-                self.y + self.height * 0.1 + y_offset,
-            );
+            let y_offset = (self.button_height + (self.button_height * 0.2)) * indx as f32
+                + (2.0 * self.button_height);
+
+            self.buttons[indx].set_start(self.x + 10.0, self.y + y_offset);
             self.buttons[indx].set_end(
-                self.x + self.width * 0.95,
-                self.y + self.height * 0.15 + y_offset,
+                self.x + self.width - 10.0,
+                self.y + y_offset + self.button_height,
             );
             // Draw the button
             self.buttons[indx].draw(pixmap);
@@ -269,11 +271,12 @@ impl Drawable for Button {
 
         // Render the square label using ab_glyph and tiny_skia
         let text = &self.label;
-        let text_size = (self.end_x - self.start_x) * 0.15; // Adjust text size relative to square size
+        let text_size = (self.end_y - self.start_y) * 0.75; // Adjust text size relative to square size
 
         // Calculate text position (center it in the square)
-        let text_x = self.start_x + (self.end_x - self.start_x) * 0.2;
-        let text_y = self.start_y + (self.end_y - self.start_y) * 0.2 + text_size * 0.8;
+        let text_x = self.start_x + ((self.end_x - self.start_x) / 2.0)
+            - ((self.label.len() / 2) as f32 * (text_size));
+        let text_y = self.start_y + (self.end_y - self.start_y) * 0.1 + text_size * 0.8;
         //let text_y = self.y + self.size * 0.9;
 
         // Create a path for the text

@@ -118,6 +118,7 @@ impl App {
                 height as f32 - (board_padding * 2.0),
                 0xCCCCCC0F,
                 "The Game".to_string(),
+                (sq_size / 2.0) as f32,
                 button_list,
             );
 
@@ -136,7 +137,7 @@ impl App {
             }
 
             //let player = Png::new();
-            let player_position = Self::get_sq_center(
+            let mut player_position = Self::get_sq_center(
                 &self.game_board,
                 (self.game_state.user_position - 1) as usize,
             )
@@ -144,12 +145,16 @@ impl App {
 
             let player = Png::new(0);
 
-            player.draw(
+            if self.game_state.new_game {
+                player_position.0 = player_position.0 - sq_size;
+            }
+
+            player.draw_png_scaled_height(
                 &mut buffer,
                 width as u32,
-                height as u32,
                 (player_position.0 - sq_size / 2.0) as i32,
                 (player_position.1 - sq_size / 2.0) as i32,
+                (sq_size * 0.9) as u32,
                 !get_range_flag(self.game_state.user_position, grid_count as u32),
             );
 
