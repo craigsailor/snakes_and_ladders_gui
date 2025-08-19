@@ -1,3 +1,4 @@
+pub mod assets;
 pub mod drawable;
 pub mod game_board;
 pub mod game_controls;
@@ -6,6 +7,7 @@ pub mod objects;
 
 // Re-export commonly used items for convenience
 pub use crate::game_board::GameBoard;
+//pub use assets::*;
 pub use drawable::Drawable;
 pub use game_controls::{Button, GameControls};
 pub use game_state::GameState;

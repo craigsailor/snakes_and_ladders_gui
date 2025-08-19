@@ -1,3 +1,4 @@
+use crate::font_list;
 use ab_glyph::{Font, FontArc, Glyph, PxScale};
 use image::DynamicImage;
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
@@ -54,8 +55,8 @@ impl GameSquare {
 impl Drawable for GameSquare {
     fn draw(&self, pixmap: &mut Pixmap) {
         // The font for the numbering of the squares
-        let font_data = include_bytes!("../DejaVuSans-Bold.ttf");
-        let font = FontArc::try_from_slice(font_data).expect("Failed to load font");
+        let font_data = font_list!();
+        let font = FontArc::try_from_slice(font_data[1]).expect("Failed to load font");
 
         // Simple square
         let points = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
