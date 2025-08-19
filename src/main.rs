@@ -3,6 +3,7 @@ pub mod game_board;
 pub mod game_controls;
 pub mod game_state;
 pub mod objects;
+pub mod vdf;
 
 // Re-export commonly used items for convenience
 pub use crate::game_board::GameBoard;
@@ -20,13 +21,16 @@ use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::sync::Arc;
 //use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
+use curv::BigInt;
+use std::sync::mpsc::Receiver;
+use std::thread;
+// use std::time::Duration;
 use tiny_skia::{Color, Pixmap};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
-
 struct App {
     window: Option<Arc<Window>>,
     surface: Option<Surface<Arc<Window>, Arc<Window>>>,
@@ -62,7 +66,7 @@ impl App {
         }
         // Player 0 spins immediately
         self.first_called = true; // Set to true to indicate a turn is in progress
-                                  //println!("Taking a turn...player 1");
+        //println!("Taking a turn...player 1");
         self.game_state.spin(0);
 
         // Player 1 spins after delay
@@ -97,7 +101,7 @@ impl App {
             // Draw a 10x10 grid of squares
             let board_size = cmp::min(width, height) as f32 * 0.9; // 80% of the smaller dimension
             let board_padding = cmp::min(width, height) as f32 * 0.1; // 5%
-                                                                      //let grid_count = 10.0;
+            //let grid_count = 10.0;
             let grid_count = self.game_state.grid_size as f32;
             let spacing = (board_size / grid_count) as f32 * 0.1;
             let sq_size = (board_size / grid_count) - (spacing * 2.0);
@@ -343,6 +347,24 @@ fn get_range_flag(n: u32, range_size: u32) -> bool {
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
+
+    // Spawn counter thread
+    thread::spawn(|| {
+        println!("=== VDF Property Checker ===");
+        let x = BigInt::from(42);
+        println!("Input x: {}", x);
+
+        let a_b_delta = vdf::custom_setup(&x);
+        println!("Discriminant: {}", a_b_delta.delta);
+        println!("Initial form: a={}, b={}", a_b_delta.a, a_b_delta.b);
+
+        println!("\n=== Search Phase ===");
+        let rx: Receiver<BigInt> = vdf::start_search(a_b_delta);
+
+        while let Ok(iteration) = rx.recv() {
+            println!("Found at iteration {}: divisible by 100", iteration);
+        }
+    });
 
     let mut app = App::new();
     event_loop.run_app(&mut app).unwrap();
