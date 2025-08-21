@@ -20,10 +20,11 @@ use softbuffer::{Context, Surface};
 //use std::fs;
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread::{self, JoinHandle};
 //use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
 use curv::BigInt;
-use std::sync::mpsc::Receiver;
-use std::thread;
 // use std::time::Duration;
 use tiny_skia::{Color, Pixmap};
 use winit::application::ApplicationHandler;
@@ -40,6 +41,9 @@ struct App {
     game_board: GameBoard,
     game_controls: GameControls,
     first_called: bool,
+    mining_thread: Option<JoinHandle<()>>,
+    mining_stop_signal: Option<Arc<AtomicBool>>,
+    is_mining: bool,
 }
 
 impl App {
@@ -56,6 +60,9 @@ impl App {
             },
             game_controls: GameControls::new(),
             first_called: false,
+            mining_thread: None,
+            mining_stop_signal: None,
+            is_mining: false,
         }
     }
 
@@ -127,8 +134,8 @@ impl App {
             );
 
             let button_list = vec![
-                Button::new("Spin".to_string(), 0x00CC00FF),
-                Button::new("Mine".to_string(), 0xCC0000FF),
+                Button::new("Roll".to_string(), 0x00CC00FF),
+                Button::new("Dig".to_string(), 0xCC0000FF),
                 Button::new("Reset".to_string(), 0x0000CCFF),
             ];
 
@@ -190,6 +197,88 @@ impl App {
 
             // Present the buffer
             buffer.present().unwrap();
+        }
+    }
+
+    fn start_mining(&mut self) {
+        if self.is_mining {
+            return; // Already mining
+        }
+
+        // Create stop signal
+        let stop_signal = Arc::new(AtomicBool::new(false));
+        let stop_signal_clone = stop_signal.clone();
+
+        // Spawn the mining thread
+        let handle = thread::spawn(move || {
+            println!("=== VDF Property Checker ===");
+            let x = BigInt::from(42);
+            println!("Input x: {}", x);
+
+            let a_b_delta = vdf::custom_setup(&x);
+            println!("Discriminant: {}", a_b_delta.delta);
+            println!("Initial form: a={}, b={}", a_b_delta.a, a_b_delta.b);
+
+            println!("\n=== Search Phase ===");
+
+            // Pass the stop signal to the VDF search function
+            // You'll need to modify vdf::start_search to accept a stop signal
+            let rx: Receiver<BigInt> =
+                vdf::start_search_with_stop(a_b_delta, stop_signal_clone.clone());
+
+            // Process results until stopped or completed
+            while !stop_signal_clone.load(Ordering::Relaxed) {
+                match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                    Ok(iteration) => {
+                        println!("Found at iteration {}: divisible by 1000", iteration);
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                        // Continue checking for stop signal
+                        continue;
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                        println!("VDF search completed or disconnected");
+                        break;
+                    }
+                }
+            }
+
+            if stop_signal_clone.load(Ordering::Relaxed) {
+                println!("Mining stopped by user request");
+            }
+        });
+
+        self.mining_thread = Some(handle);
+        self.mining_stop_signal = Some(stop_signal);
+        self.is_mining = true;
+        println!("Mining started!");
+    }
+
+    fn stop_mining(&mut self) {
+        if !self.is_mining {
+            return; // Not currently mining
+        }
+
+        // Signal the thread to stop
+        if let Some(stop_signal) = &self.mining_stop_signal {
+            stop_signal.store(true, Ordering::Relaxed);
+        }
+
+        // Wait for the thread to finish
+        if let Some(handle) = self.mining_thread.take() {
+            let _ = handle.join(); // Ignore join errors
+        }
+
+        self.mining_stop_signal = None;
+        self.is_mining = false;
+        println!("Mining stopped!");
+    }
+
+    fn toggle_mining(&mut self) {
+        if self.is_mining {
+            self.stop_mining();
+        } else {
+            self.start_mining();
         }
     }
 }
@@ -290,12 +379,11 @@ impl ApplicationHandler for App {
                                 }
                                 */
                             }
-                            "Mine" => {
-                                //self.game_state.mine();
+                            "Dig" => {
+                                self.toggle_mining();
                             }
                             "Reset" => {
                                 self.game_state.reset();
-                                self.game_board.reset();
                             }
                             _ => {}
                         }
@@ -347,24 +435,6 @@ fn get_range_flag(n: u32, range_size: u32) -> bool {
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
-
-    // Spawn counter thread
-    thread::spawn(|| {
-        println!("=== VDF Property Checker ===");
-        let x = BigInt::from(42);
-        println!("Input x: {}", x);
-
-        let a_b_delta = vdf::custom_setup(&x);
-        println!("Discriminant: {}", a_b_delta.delta);
-        println!("Initial form: a={}, b={}", a_b_delta.a, a_b_delta.b);
-
-        println!("\n=== Search Phase ===");
-        let rx: Receiver<BigInt> = vdf::start_search(a_b_delta);
-
-        while let Ok(iteration) = rx.recv() {
-            println!("Found at iteration {}: divisible by 100", iteration);
-        }
-    });
 
     let mut app = App::new();
     event_loop.run_app(&mut app).unwrap();
