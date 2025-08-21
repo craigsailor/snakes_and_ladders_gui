@@ -18,7 +18,7 @@ pub struct GameState {
     pub arrows: Vec<(u32, u32)>, // Pairs of arrows
 
     // Non-drawable objects
-    pub users: Vec<User>,
+    pub users: [User; 2],
     pub settings: GameSettings,
     pub colors: Vec<u32>,
     //pub board_type: GameBoard,
@@ -47,7 +47,7 @@ impl GameState {
 
         Self {
             arrows: arrows, // Initialize with an empty vector
-            users: vec![
+            users: [
                 User::new(
                     0,                      // Default user ID
                     "Player 1".to_string(), // Default user name

@@ -2,6 +2,7 @@ use ab_glyph::{Font, FontArc, Glyph, PxScale};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform};
 
 use crate::drawable::Drawable;
+use crate::font_list;
 
 // Drawable objects
 #[derive(Debug, Clone)]
@@ -76,8 +77,9 @@ impl GameControls {
 impl GameControls {
     pub fn draw(&mut self, pixmap: &mut Pixmap) {
         // The font for the numbering of the squares
-        let font_data = include_bytes!("./DejaVuSans-Bold.ttf");
-        let font = FontArc::try_from_slice(font_data).expect("Failed to load font");
+        //let font_data = include_bytes!("./DejaVuSans-Bold.ttf");
+        let font_data = font_list!();
+        let font = FontArc::try_from_slice(font_data[1]).expect("Failed to load font");
 
         let path = PathBuilder::from_rect(
             Rect::from_ltrb(self.x, self.y, self.x + self.width, self.y + self.height).unwrap(),
@@ -266,8 +268,8 @@ impl Drawable for Button {
             None,
         );
 
-        let font_data = include_bytes!("./DejaVuSans-Bold.ttf");
-        let font = FontArc::try_from_slice(font_data).expect("Failed to load font");
+        let font_data = font_list!();
+        let font = FontArc::try_from_slice(font_data[1]).expect("Failed to load font");
 
         // Render the square label using ab_glyph and tiny_skia
         let text = &self.label;
