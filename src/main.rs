@@ -169,8 +169,12 @@ impl App {
 
                 let player = Png::new(player_num as i32, player_num as usize);
 
+                // Position players to the left of the start square
                 if self.game_state.new_game {
-                    player_position.0 = player_position.0 - sq_size;
+                    player_position.0 =
+                        player_position.0 - sq_size + ((player_num % 2) as f32 * (sq_size / 5.0));
+                    player_position.1 =
+                        player_position.1 - ((player_num % 2) as f32 * (sq_size / 4.0));
                 }
 
                 player.draw_png_scaled_height(
