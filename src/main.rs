@@ -21,9 +21,9 @@ use std::cmp;
 use softbuffer::{Context, Surface};
 //use std::fs;
 use std::num::NonZeroU32;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 //use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
 use curv::BigInt;
@@ -75,7 +75,7 @@ impl App {
         }
         // Player 0 spins immediately
         self.first_called = true; // Set to true to indicate a turn is in progress
-        //println!("Taking a turn...player 1");
+                                  //println!("Taking a turn...player 1");
         self.game_state.spin(0);
 
         // Player 1 spins after delay
@@ -110,7 +110,7 @@ impl App {
             // Draw a 10x10 grid of squares
             let board_size = cmp::min(width, height) as f32 * 0.9; // 80% of the smaller dimension
             let board_padding = cmp::min(width, height) as f32 * 0.1; // 5%
-            //let grid_count = 10.0;
+                                                                      //let grid_count = 10.0;
             let grid_count = self.game_state.grid_size as f32;
             let spacing = (board_size / grid_count) as f32 * 0.1;
             let sq_size = (board_size / grid_count) - (spacing * 2.0);
@@ -370,7 +370,7 @@ impl ApplicationHandler for App {
                 {
                     Some(button_name) => {
                         match button_name.as_str() {
-                            "Spin" => {
+                            "Roll" => {
                                 self.take_a_turn();
                                 //self.game_state.spin();
                                 /*
