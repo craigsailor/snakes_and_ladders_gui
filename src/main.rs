@@ -3,6 +3,7 @@ pub mod game_board;
 pub mod game_controls;
 pub mod game_state;
 pub mod objects;
+pub mod vdf;
 
 // Re-export commonly used items for convenience
 pub use crate::game_board::GameBoard;
@@ -19,14 +20,18 @@ use softbuffer::{Context, Surface};
 //use std::fs;
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread::{self, JoinHandle};
 //use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
+use curv::BigInt;
+// use std::time::Duration;
 use tiny_skia::{Color, Pixmap};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
-
 struct App {
     window: Option<Arc<Window>>,
     surface: Option<Surface<Arc<Window>, Arc<Window>>>,
@@ -36,6 +41,9 @@ struct App {
     game_board: GameBoard,
     game_controls: GameControls,
     first_called: bool,
+    mining_thread: Option<JoinHandle<()>>,
+    mining_stop_signal: Option<Arc<AtomicBool>>,
+    is_mining: bool,
 }
 
 impl App {
@@ -52,6 +60,9 @@ impl App {
             },
             game_controls: GameControls::new(),
             first_called: false,
+            mining_thread: None,
+            mining_stop_signal: None,
+            is_mining: false,
         }
     }
 
@@ -62,7 +73,7 @@ impl App {
         }
         // Player 0 spins immediately
         self.first_called = true; // Set to true to indicate a turn is in progress
-                                  //println!("Taking a turn...player 1");
+        //println!("Taking a turn...player 1");
         self.game_state.spin(0);
 
         // Player 1 spins after delay
@@ -97,7 +108,7 @@ impl App {
             // Draw a 10x10 grid of squares
             let board_size = cmp::min(width, height) as f32 * 0.9; // 80% of the smaller dimension
             let board_padding = cmp::min(width, height) as f32 * 0.1; // 5%
-                                                                      //let grid_count = 10.0;
+            //let grid_count = 10.0;
             let grid_count = self.game_state.grid_size as f32;
             let spacing = (board_size / grid_count) as f32 * 0.1;
             let sq_size = (board_size / grid_count) - (spacing * 2.0);
@@ -123,8 +134,8 @@ impl App {
             );
 
             let button_list = vec![
-                Button::new("Spin".to_string(), 0x00CC00FF),
-                Button::new("Mine".to_string(), 0xCC0000FF),
+                Button::new("Roll".to_string(), 0x00CC00FF),
+                Button::new("Dig".to_string(), 0xCC0000FF),
                 Button::new("Reset".to_string(), 0x0000CCFF),
             ];
 
@@ -186,6 +197,88 @@ impl App {
 
             // Present the buffer
             buffer.present().unwrap();
+        }
+    }
+
+    fn start_mining(&mut self) {
+        if self.is_mining {
+            return; // Already mining
+        }
+
+        // Create stop signal
+        let stop_signal = Arc::new(AtomicBool::new(false));
+        let stop_signal_clone = stop_signal.clone();
+
+        // Spawn the mining thread
+        let handle = thread::spawn(move || {
+            println!("=== VDF Property Checker ===");
+            let x = BigInt::from(42);
+            println!("Input x: {}", x);
+
+            let a_b_delta = vdf::custom_setup(&x);
+            println!("Discriminant: {}", a_b_delta.delta);
+            println!("Initial form: a={}, b={}", a_b_delta.a, a_b_delta.b);
+
+            println!("\n=== Search Phase ===");
+
+            // Pass the stop signal to the VDF search function
+            // You'll need to modify vdf::start_search to accept a stop signal
+            let rx: Receiver<BigInt> =
+                vdf::start_search_with_stop(a_b_delta, stop_signal_clone.clone());
+
+            // Process results until stopped or completed
+            while !stop_signal_clone.load(Ordering::Relaxed) {
+                match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                    Ok(iteration) => {
+                        println!("Found at iteration {}: divisible by 1000", iteration);
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                        // Continue checking for stop signal
+                        continue;
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                        println!("VDF search completed or disconnected");
+                        break;
+                    }
+                }
+            }
+
+            if stop_signal_clone.load(Ordering::Relaxed) {
+                println!("Mining stopped by user request");
+            }
+        });
+
+        self.mining_thread = Some(handle);
+        self.mining_stop_signal = Some(stop_signal);
+        self.is_mining = true;
+        println!("Mining started!");
+    }
+
+    fn stop_mining(&mut self) {
+        if !self.is_mining {
+            return; // Not currently mining
+        }
+
+        // Signal the thread to stop
+        if let Some(stop_signal) = &self.mining_stop_signal {
+            stop_signal.store(true, Ordering::Relaxed);
+        }
+
+        // Wait for the thread to finish
+        if let Some(handle) = self.mining_thread.take() {
+            let _ = handle.join(); // Ignore join errors
+        }
+
+        self.mining_stop_signal = None;
+        self.is_mining = false;
+        println!("Mining stopped!");
+    }
+
+    fn toggle_mining(&mut self) {
+        if self.is_mining {
+            self.stop_mining();
+        } else {
+            self.start_mining();
         }
     }
 }
@@ -286,12 +379,11 @@ impl ApplicationHandler for App {
                                 }
                                 */
                             }
-                            "Mine" => {
-                                //self.game_state.mine();
+                            "Dig" => {
+                                self.toggle_mining();
                             }
                             "Reset" => {
                                 self.game_state.reset();
-                                self.game_board.reset();
                             }
                             _ => {}
                         }
